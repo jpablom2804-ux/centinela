@@ -1,0 +1,22 @@
+.env
+*.env.local
+
+# Java
+target/
+*.class
+
+# .NET
+bin/
+obj/
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.user
+
+# Graphify (local, se regenera)
+graphify-out/

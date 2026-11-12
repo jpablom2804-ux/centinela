@@ -1,0 +1,54 @@
+# Entorno de desarrollo, fase 0: solo infraestructura. Cada servicio se agrega en su fase.
+# Los puertos se publican solo en 127.0.0.1: nada queda expuesto a la red local.
+name: centinela
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?falta POSTGRES_DB en .env}
+      POSTGRES_USER: ${POSTGRES_USER:?falta POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
+      SIMULADOR_DB_PASSWORD: ${SIMULADOR_DB_PASSWORD:?falta SIMULADOR_DB_PASSWORD en .env}
+      DETECCION_DB_PASSWORD: ${DETECCION_DB_PASSWORD:?falta DETECCION_DB_PASSWORD en .env}
+      AGENTE_DB_PASSWORD: ${AGENTE_DB_PASSWORD:?falta AGENTE_DB_PASSWORD en .env}
+      POWERBI_RO_DB_PASSWORD: ${POWERBI_RO_DB_PASSWORD:?falta POWERBI_RO_DB_PASSWORD en .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Desde PostgreSQL 18 el volumen se monta en /var/lib/postgresql (no en .../data).
+      - postgres-datos:/var/lib/postgresql
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Por TCP: durante el script de init solo escucha por socket, así que no da "sano" antes de tiempo.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    # Nombre de nodo fijo: sin esto, recrear el contenedor cambia el nodo y se pierden las colas del volumen.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?falta RABBITMQ_DEFAULT_USER en .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?falta RABBITMQ_DEFAULT_PASS en .env}
+      RABBITMQ_DEFAULT_VHOST: centinela
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-datos:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres-datos:
+  rabbitmq-datos:
