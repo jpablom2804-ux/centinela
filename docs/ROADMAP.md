@@ -47,7 +47,7 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 **Hecho cuando:** se crean tickets por la API, los relojes de SLA corren y cada acción aparece en la bitácora.
 
 ## Fase 3 — Conexión con el agente
-- [ ] ADR del proveedor de embeddings (externo o modelo local)
+- [x] ADR del proveedor de embeddings: Voyage AI ([ADR-007](decisiones/ADR-007-proveedor-de-embeddings.md))
 - [ ] Enmascarado en `mesa-servicio` y outbox para publicar `TicketCreado`
 - [ ] El agente pasa de consola a worker que consume la cola
 - [ ] API interna de solo lectura de `mesa-servicio` para las herramientas, siempre enmascarada

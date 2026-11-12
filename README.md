@@ -78,7 +78,7 @@ Cada servicio tiene sus propias instrucciones: el agente de IA en [services/agen
 | [SEGURIDAD](docs/SEGURIDAD.md) | Riesgos, controles y suite adversaria |
 | [KPIS](docs/KPIS.md) | Indicadores de servicio, calidad del triaje y costo |
 | [CONTEXTO](docs/CONTEXTO.md) | De dónde salió el proyecto y por qué |
-| [Decisiones](docs/decisiones/) | ADRs: arquitectura, lenguajes, dominio, login, secretos y proveedor del modelo |
+| [Decisiones](docs/decisiones/) | ADRs: arquitectura, lenguajes, dominio, login, secretos, proveedor del modelo y de embeddings |
 
 ## Licencia
 
