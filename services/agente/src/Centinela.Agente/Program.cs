@@ -19,10 +19,13 @@ if (args.Length != 1)
 
 // appsettings.json se lee junto al ejecutable, no desde la carpeta donde se lanzó el comando.
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { ContentRootPath = AppContext.BaseDirectory });
+// Orden (el último gana): appsettings → user-secrets → /run/secrets → variables de entorno.
+// Las variables van al final para poder ajustar la configuración (no secretos) sin tocar archivos.
 builder.Configuration
     .AddUserSecrets<CicloAgente>(optional: true)
     // En contenedor, cada secreto es un archivo en /run/secrets (ADR-005): Llm__ApiKey → Llm:ApiKey.
-    .AddKeyPerFile("/run/secrets", optional: true);
+    .AddKeyPerFile("/run/secrets", optional: true)
+    .AddEnvironmentVariables();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole(o =>

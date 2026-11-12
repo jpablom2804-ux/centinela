@@ -25,4 +25,8 @@ public sealed class OpcionesAgente
     /// <summary>Turnos de corrección si la respuesta final no pasa la validación (0 = ninguno). Cuentan en el presupuesto.</summary>
     [Range(0, 3)]
     public int MaxReparaciones { get; set; } = 1;
+
+    /// <summary>Si el proveedor pide esperar más que esto antes de reintentar (cuota agotada), no se reintenta.</summary>
+    [Range(1, 600)]
+    public int MaxEsperaReintentoSegundos { get; set; } = 30;
 }

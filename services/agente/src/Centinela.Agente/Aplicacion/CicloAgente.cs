@@ -141,6 +141,14 @@ public sealed partial class CicloAgente(
             catch (ErrorLlmException e) when (e.Reintentable && intento < _opciones.MaxReintentos)
             {
                 var espera = e.EsperaSugerida ?? TimeSpan.FromMilliseconds(_opciones.BackoffBaseMs * Math.Pow(2, intento));
+
+                // Si el proveedor pide esperar minutos (cuota agotada), esperar solo gasta el tiempo del ticket: se corta ya.
+                if (espera > TimeSpan.FromSeconds(_opciones.MaxEsperaReintentoSegundos))
+                {
+                    EsperaDemasiadoLarga(logger, e.Tipo, (long)espera.TotalSeconds, _opciones.MaxEsperaReintentoSegundos);
+                    throw;
+                }
+
                 Reintento(logger, e.Tipo, e.CodigoApi ?? "-", intento + 1, (long)espera.TotalMilliseconds);
                 await Task.Delay(espera, reloj, ct).ConfigureAwait(false);
             }
@@ -245,6 +253,9 @@ public sealed partial class CicloAgente(
 
     [LoggerMessage(EventId = 208, Level = LogLevel.Error, Message = "Ticket {TicketId}: la herramienta {Herramienta} lanzó {TipoExcepcion}")]
     private static partial void HerramientaFallo(ILogger logger, Guid ticketId, string herramienta, string tipoExcepcion);
+
+    [LoggerMessage(EventId = 209, Level = LogLevel.Warning, Message = "La API del modelo pide esperar {EsperaSegundos} s ({Tipo}), más que el máximo de {MaximoSegundos} s: no se reintenta")]
+    private static partial void EsperaDemasiadoLarga(ILogger logger, TipoErrorLlm tipo, long esperaSegundos, int maximoSegundos);
 
     [LoggerMessage(EventId = 205, Level = LogLevel.Warning, Message = "Error reintentable de la API del modelo ({Tipo}, {CodigoApi}); reintento {Intento} en {EsperaMs} ms")]
     private static partial void Reintento(ILogger logger, TipoErrorLlm tipo, string codigoApi, int intento, long esperaMs);

@@ -157,6 +157,23 @@ public class CicloAgenteTests
     }
 
     [Fact]
+    public async Task Si_el_proveedor_pide_esperar_minutos_no_se_reintenta_y_corta_enseguida()
+    {
+        // Lo que pasó con la cuota del plan gratis de Groq: 429 con retry-after de 348 s.
+        var cliente = new ClienteLlmFalso()
+            .Falla(new ErrorLlmException(TipoErrorLlm.LimiteTasa, reintentable: true, 429, TimeSpan.FromSeconds(348)));
+        var logger = new LoggerCapturador<CicloAgente>();
+        var inicio = DateTime.UtcNow;
+
+        var resultado = await Fabrica.Ciclo(cliente, logger: logger).TriarAsync(Fabrica.TicketVpn(), CancellationToken.None);
+
+        Assert.Equal(EstadoAnalisis.Error, resultado.Estado);
+        Assert.Single(cliente.Solicitudes);
+        Assert.True(DateTime.UtcNow - inicio < TimeSpan.FromSeconds(5));
+        Assert.Contains(logger.Registros, r => r.Mensaje.Contains("348 s", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Respuesta_cortada_por_max_tokens_queda_invalida()
     {
         var cliente = new ClienteLlmFalso().Responde(Respuestas.ConMotivo(MotivoParada.LimiteTokens));
