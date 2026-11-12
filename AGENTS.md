@@ -26,7 +26,7 @@ La base es el skill `buenas-practicas-java-react`. En Claude Code se usa la vers
 | Mensajería | RabbitMQ, solo para lo que cruza servicios |
 | Despliegue | Contenedores: compose en desarrollo → servidor Rocky Linux con nginx como reverse proxy → Kubernetes (k3s o kind) |
 | Sistema destino | Rocky Linux (compatible con RHEL: aplican las reglas [RHEL] del skill) |
-| Autenticación | OIDC con Keycloak (fase 4). Roles: `solicitante`, `tecnico`, `coordinador`, `aprobador_cambios`, `auditor`. Sin login hecho a mano |
+| Autenticación | OIDC con Keycloak (fase 4) y BFF: `mesa-servicio` es el cliente OIDC y el navegador solo tiene una cookie de sesión — ADR-004. Roles: `solicitante`, `tecnico`, `coordinador`, `aprobador_cambios`, `auditor`. Sin login hecho a mano |
 | Maneja dinero | No directamente. Si aparecen montos (por ejemplo, el costo de un cambio o del agente), aplican las reglas de dinero del skill |
 | Usuarios | Empleados que reportan, técnicos de soporte, coordinadores, comité de cambios, auditoría (simulados) |
 | Integraciones | API de LLM (Anthropic), proveedor de embeddings (a decidir en la fase 3), RabbitMQ, Power BI (solo lectura) |
@@ -48,7 +48,23 @@ La base es el skill `buenas-practicas-java-react`. En Claude Code se usa la vers
 - **Segregación de funciones** validada en el backend: en un cambio, solicitante ≠ aprobador ≠ ejecutor.
 - **Relojes de SLA** en UTC, con calendario laboral configurable. Se pausan en `en_espera` y cada pausa queda auditada.
 - **Un ticket cerrado no se edita:** se reabre con justificación.
-- **Control de acceso por rol y por recurso,** verificado en el backend: un solicitante solo ve sus tickets.
+- **Control de acceso por rol y por recurso,** verificado en el backend: un solicitante solo ve sus tickets. Ticket ajeno e inexistente responden igual (`404`, mismo cuerpo y mismo camino de código), para no revelar qué existe ni por el mensaje ni por el tiempo de respuesta.
+
+## Reglas de login y sesión (ADR-004)
+
+- Ningún token en el navegador: ni en `localStorage`, ni en `sessionStorage`, ni en cookies legibles por JavaScript.
+- Cookie de sesión `__Host-SESSION` con `HttpOnly`, `Secure` y `SameSite=Lax`; CSRF activo en todo lo que modifica; nuevo ID de sesión al iniciar sesión; inactividad 15 min y absoluta 8 h.
+- Fuerza bruta: bloqueo **temporal** en Keycloak (nunca permanente) más rate limiting por IP en nginx.
+- Mensajes de error de login idénticos para usuario inexistente y contraseña incorrecta, también en la recuperación de contraseña.
+- MFA obligatorio para `coordinador`, `aprobador_cambios` y `auditor`.
+
+## Reglas de despliegue y réplicas
+
+Aprendidas en el proyecto anterior en Rocky Linux (scoopy) y en `docs/ARQUITECTURA.md`:
+
+- **Compatible con Podman:** imágenes con nombre completo (`docker.io/...`) y montajes con etiqueta SELinux `:z`/`:Z`. SELinux nunca se desactiva.
+- **Todo servicio debe aguantar varias réplicas:** sin estado en memoria entre peticiones, sin sesiones pegajosas, tareas programadas con bloqueo en la base (ShedLock), outbox con `SKIP LOCKED`.
+- **nginx es la única puerta:** TLS, rate limiting, headers de seguridad, `X-Request-ID` y `/actuator/` bloqueado. Ningún servicio publica puertos hacia afuera; en desarrollo solo en `127.0.0.1`.
 
 ## Principios y anti‑sobreingeniería
 
@@ -81,6 +97,7 @@ Se aplican tal cual las del skill: SOLID, DRY, KISS, YAGNI, composición sobre h
 - **Salida estructurada y validada.** JSON validado contra un esquema: categoría, sistema afectado, prioridad sugerida con justificación, posibles duplicados, artículos sugeridos y borrador de respuesta. Si no valida, el ticket queda sin sugerencia para triaje manual.
 - **Salida acotada:** `justificacion` y `borradorRespuesta` los genera el modelo, así que son texto no confiable. Tienen largo máximo (`docs/EVENTOS.md`), se validan al recibirse y se muestran como texto plano. El borrador solo se envía si un técnico lo aprueba.
 - **Límites por ticket:** máximo de iteraciones, tiempo y presupuesto de tokens. Al superarlos, triaje manual.
+- **Errores de la API del modelo clasificados:** saldo insuficiente, key inválida o petición inválida no se reintentan. El ticket va a triaje manual, el agente pausa las llamadas y se alerta, para no gastar reintentos ni llenar la DLQ. `429`, saturación, `5xx` y timeouts se reintentan con backoff, respetando `retry-after`, hasta un máximo.
 - **Tope diario de tokens** en `agente` (desde la fase 3): al alcanzarlo, los tickets pasan a triaje manual sin llamar al modelo. La alerta de **costo** diario (en dinero) la calcula `reportes`, que es quien conoce los precios.
 - **Medir siempre:** tokens de entrada y salida, modelo, duración e iteraciones de cada ticket (ver `docs/KPIS.md`).
 - **Modelo, umbrales y precios por configuración**, nunca en el código.
@@ -117,6 +134,7 @@ Además de la lista del skill:
 - [ ] Ningún servicio accede a tablas de otro.
 - [ ] Nada sin enmascarar llega al LLM ni a los logs.
 - [ ] Acciones nuevas registradas en la bitácora de `auditoria`.
+- [ ] Endpoints nuevos: `404` sin revelar existencia, CSRF activo y aguantan varias réplicas.
 - [ ] Mensajes nuevos o cambiados documentados en `docs/EVENTOS.md`.
 - [ ] Si se tocó el agente: suite adversaria en verde y métricas de tokens registradas.
 - [ ] Comentarios de flujo y `docs/FLUJOS.md` al día.

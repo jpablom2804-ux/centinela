@@ -57,6 +57,24 @@ Por qué dos roles en `mesa-servicio`: el dueño de una tabla siempre puede modi
 
 La extensión `vector` vive en el esquema `mesa_servicio`.
 
+Keycloak (fase 4) usa su propia base de datos, `keycloak`, con su propio usuario, en la misma instancia de PostgreSQL (ADR-004).
+
+## Varias réplicas y balanceo de carga
+
+Desde la fase 8, `mesa-servicio` corre en al menos 2 réplicas detrás de nginx (en Rocky Linux) o de un Service con Ingress (en Kubernetes). Para que funcione sin sorpresas:
+
+| Tema | Decisión |
+|---|---|
+| Entrada | nginx es la única puerta: termina TLS, aplica rate limiting y reparte con `upstream` (round robin). Detecta réplicas caídas de forma pasiva con `max_fails` y `fail_timeout`; en Kubernetes eso lo hacen las readiness probes |
+| Sesiones | Sin sesiones pegajosas. La sesión del BFF vive en PostgreSQL (Spring Session JDBC), así que cualquier réplica atiende cualquier petición (ADR-004) |
+| Tareas programadas | El reloj de SLA corre en una sola réplica a la vez: bloqueo en la base con ShedLock |
+| Outbox | El publicador toma filas con `SELECT … FOR UPDATE SKIP LOCKED`, así que dos réplicas no publican el mismo evento |
+| Migraciones | Flyway toma un bloqueo en la base; aun así, las migraciones se corren una vez antes de levantar las réplicas (en Kubernetes, como Job) |
+| Rate limiting | En nginx, que ve todas las peticiones. Si cada réplica limitara por su cuenta, el límite real se multiplicaría por el número de réplicas |
+| IP del cliente | nginx manda `X-Forwarded-For` y `X-Forwarded-Proto`; Spring usa `server.forward-headers-strategy: framework` y solo confía en el proxy |
+| Trazabilidad | nginx genera `X-Request-ID` y se propaga como `correlationId` |
+| `agente` | Escala como consumidores que compiten por la misma cola, con `prefetch` 1 y deduplicación por `ticketId` (`docs/EVENTOS.md`) |
+
 ## Interior del `agente` (hexagonal ligero)
 
 ```

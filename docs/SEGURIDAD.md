@@ -23,6 +23,7 @@ Verificar siempre la numeración y el texto oficiales en owasp.org y genai.owasp
 | Abuso de herramientas / agencia excesiva | El agente usa herramientas para algo distinto del triaje | Solo 3 herramientas de solo lectura, parámetros validados, límite de resultados, sin `ticketId` elegido por el modelo |
 | Abuso de privilegios | `buscar_tickets_similares` filtra datos de otros solicitantes | La API interna devuelve solo texto enmascarado y nunca datos del solicitante (nombre, correo, área) |
 | Manejo inseguro de la salida | El borrador de respuesta o la justificación llevan HTML o scripts | Largo máximo y validación al recibir; texto plano en el frontend; el borrador solo se envía si un técnico lo aprueba |
+| Saldo agotado o error de la API del modelo | La API responde que no hay crédito, que la key es inválida o que está saturada | Errores no reintentables (saldo insuficiente, key inválida, petición inválida): el ticket va a triaje manual, el agente pausa las llamadas al modelo y se alerta, sin pasar cada ticket por reintentos y DLQ. Reintentables (`429`, saturación, `5xx`, timeout): backoff respetando `retry-after`, con máximo |
 | Consumo sin límite | Un ticket provoca un ciclo largo o muy caro, o llega una avalancha de tickets | Máximo de iteraciones, tiempo y tokens por ticket (fase 1). Tope diario de tokens en `agente` y deduplicación por `ticketId` (fase 3). Alerta de costo diario en dinero desde `reportes` (fase 7) |
 | Envenenamiento de la base de conocimiento | Un artículo con instrucciones maliciosas termina en las sugerencias | Los artículos se tratan como datos no confiables; los artículos nuevos los publica un humano |
 | Envenenamiento de memoria | Si en el futuro el agente guarda memoria entre tickets | Hoy no hay memoria entre tickets. Agregarla requiere un ADR |
@@ -36,6 +37,32 @@ Verificar siempre la numeración y el texto oficiales en owasp.org y genai.owasp
 | Aprobarse un cambio a uno mismo | Segregación de funciones validada en el backend: solicitante ≠ aprobador ≠ ejecutor |
 | Ver tickets ajenos (IDOR) | Control de acceso por rol y por recurso en cada endpoint |
 | Editar un ticket cerrado | Solo se reabre con justificación, y queda auditado |
+
+## Login, sesiones y cookies (ADR-004)
+
+| Riesgo | Control |
+|---|---|
+| Fuerza bruta de contraseñas | Detección de fuerza bruta de Keycloak con bloqueo **temporal** (5 fallos, espera de 1 a 15 min). Rate limiting por IP en nginx sobre el login y `/api` (`429`). Sin bloqueo permanente, para que nadie pueda bloquear cuentas ajenas a propósito |
+| Enumeración de usuarios por mensaje o por tiempo de respuesta | Mismo mensaje y mismo camino para "usuario no existe" y "contraseña incorrecta", también en "olvidé mi contraseña". La diferencia de milisegundos se mide en la suite |
+| Enumeración de recursos | Ticket ajeno y ticket inexistente responden igual (`404`) y siguen el mismo camino de código |
+| Robo de token por XSS | BFF: ningún token llega al navegador. Cookie `__Host-SESSION` con `HttpOnly`, `Secure` y `SameSite=Lax`. CSP estricta en nginx |
+| CSRF | Token CSRF de Spring Security (`XSRF-TOKEN` → header `X-XSRF-TOKEN`) en toda petición que modifica algo |
+| Fijación y secuestro de sesión | Nuevo ID de sesión al iniciar sesión; inactividad 15 min, absoluta 8 h; cerrar sesión invalida también la sesión de Keycloak |
+| Cuentas con poder | MFA (OTP) obligatorio para `coordinador`, `aprobador_cambios` y `auditor` |
+| Consola de Keycloak expuesta | Solo por localhost o túnel SSH, nunca publicada |
+
+## Despliegue (lecciones del proyecto anterior en Rocky Linux)
+
+| Riesgo | Control |
+|---|---|
+| Fuga de versión y de información del servidor | `server_tokens off`; `/actuator/` bloqueado hacia afuera (`404`); errores sin stack trace |
+| Clickjacking, MIME sniffing, XSS | Headers en nginx: `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, y `Strict-Transport-Security` (HSTS) porque aquí nginx termina TLS |
+| Contenedores con root | nginx sin root (`nginx-unprivileged`, puerto 8080) y servicios con usuario dedicado |
+| Puertos expuestos de más | firewalld: solo SSH, 80 y 443. PostgreSQL, RabbitMQ, Keycloak admin y los servicios solo en la red interna o en `127.0.0.1` |
+| SSH | Solo con llave, sin login de root, usuario de despliegue dedicado |
+| SELinux desactivado "para que funcione" | Siempre en enforcing; montajes con etiqueta `:z`/`:Z` y `setsebool -P httpd_can_network_connect 1` para el proxy |
+| Secretos en el servidor | `.env` con permisos `600`, del usuario de despliegue. Nunca en la imagen |
+| Pérdida de datos | `pg_dump` programado, copiado fuera del servidor, y una restauración de prueba documentada |
 
 ## Suite adversaria (`tests/adversarial/`)
 
@@ -51,6 +78,16 @@ Cada caso es un archivo con la entrada, el ataque y el resultado esperado. Los 5
 8. Borrador de respuesta con HTML o scripts → se muestra como texto plano.
 9. Evento duplicado, o el mismo `ticketId` con otro `id` → un solo triaje y una sola llamada al modelo.
 10. Solicitante intenta aprobar su propio cambio → rechazado por el backend.
+11. Respuesta de la API de LLM por saldo insuficiente (cliente LLM falso) → el ticket queda para triaje manual, el agente deja de llamar al modelo y se alerta; sin reintentos en bucle.
+
+Casos de login y sesión (fase 6, contra Keycloak y `mesa-servicio`):
+
+12. 6 contraseñas incorrectas seguidas → la cuenta queda bloqueada temporalmente y nginx empieza a responder `429`.
+13. Login con usuario inexistente contra usuario existente con contraseña incorrecta → mismo mensaje, y la diferencia de la mediana de tiempos en 50 intentos de cada uno es menor a 50 ms.
+14. Pedir el ticket de otro solicitante y uno inexistente → mismo `404`, mismo cuerpo y tiempos comparables.
+15. `POST` a `/api` sin token CSRF → `403`.
+16. La cookie de sesión tiene `HttpOnly`, `Secure`, `SameSite=Lax` y el prefijo `__Host-`; no hay ningún token en `localStorage`, `sessionStorage` ni en cookies legibles por JavaScript.
+17. El ID de sesión cambia después del login; tras cerrar sesión, la cookie anterior ya no sirve.
 
 Los casos con el cliente LLM falso corren siempre y no gastan tokens. Los que necesitan el modelo real se corren a mano cuando cambia un prompt, una herramienta o el modelo, y se registran sus tokens.
 

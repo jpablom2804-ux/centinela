@@ -1,11 +1,12 @@
 # Entorno de desarrollo, fase 0: solo infraestructura. Cada servicio se agrega en su fase.
 # Los puertos se publican solo en 127.0.0.1: nada queda expuesto a la red local.
+# Compatible con Podman (Rocky Linux): imágenes con nombre completo y montajes con etiqueta SELinux.
 name: centinela
 
 services:
   postgres:
     # PostgreSQL 18 con la extensión pgvector ya instalada (búsqueda por significado).
-    image: pgvector/pgvector:pg18
+    image: docker.io/pgvector/pgvector:pg18
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?falta POSTGRES_DB en .env}
       POSTGRES_USER: ${POSTGRES_USER:?falta POSTGRES_USER en .env}
@@ -19,7 +20,8 @@ services:
     volumes:
       # Desde PostgreSQL 18 el volumen se monta en /var/lib/postgresql (no en .../data).
       - postgres-datos:/var/lib/postgresql
-      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+      # z: etiqueta SELinux para que el contenedor pueda leer la carpeta en Rocky; Docker sin SELinux la ignora.
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro,z
     healthcheck:
       # Por TCP: durante el script de init solo escucha por socket, así que no da "sano" antes de tiempo.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
@@ -30,7 +32,7 @@ services:
     restart: unless-stopped
 
   rabbitmq:
-    image: rabbitmq:4-management
+    image: docker.io/library/rabbitmq:4-management
     # Nombre de nodo fijo: sin esto, recrear el contenedor cambia el nodo y se pierden las colas del volumen.
     hostname: rabbitmq
     environment:
