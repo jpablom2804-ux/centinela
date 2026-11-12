@@ -6,6 +6,7 @@
 #   ./scripts/secretos.sh llave      crea tu llave de age (si no existe) y la registra en .sops.yaml
 #   ./scripts/secretos.sh cifrar     guarda secrets/ cifrado en secrets.enc.env (este archivo sí se versiona)
 #   ./scripts/secretos.sh descifrar  recrea secrets/ desde secrets.enc.env (por ejemplo, en otra máquina)
+#   ./scripts/secretos.sh guardar N  pide sin mostrarlo un secreto externo (por ejemplo voyage_api_key) y lo guarda
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -19,6 +20,11 @@ NOMBRES=(
   powerbi_ro_db_password
   rabbitmq_password
   usuarios_prueba_password
+)
+# Secretos que no se pueden generar (los entrega un proveedor). Son opcionales: sin ellos
+# la aplicación arranca igual y usa su camino de respaldo (ADR-007).
+EXTERNOS=(
+  voyage_api_key
 )
 RABBITMQ_USUARIO=${RABBITMQ_USUARIO:-centinela}
 
@@ -86,10 +92,16 @@ cifrar() {
   local plano="$DIR/.plano.env"
   # Comillas dobles: la ruta se fija ahora, porque al salir la variable local ya no existe.
   trap "rm -f '$plano'" EXIT
-  (umask 077 && for n in "${NOMBRES[@]}"; do
-    [ -s "$DIR/$n" ] || { echo "Falta $DIR/$n: corre './scripts/secretos.sh generar'." >&2; exit 1; }
-    echo "$n=$(cat "$DIR/$n")"
-  done > "$plano")
+  # La redirección va dentro del subshell para que el archivo plano nazca ya con umask 077.
+  (umask 077 && {
+    for n in "${NOMBRES[@]}"; do
+      [ -s "$DIR/$n" ] || { echo "Falta $DIR/$n: corre './scripts/secretos.sh generar'." >&2; exit 1; }
+      echo "$n=$(cat "$DIR/$n")"
+    done
+    for n in "${EXTERNOS[@]}"; do
+      if [ -s "$DIR/$n" ]; then echo "$n=$(cat "$DIR/$n")"; fi
+    done
+  } > "$plano")
   sops encrypt --filename-override "$CIFRADO" --input-type dotenv --output-type dotenv "$plano" > "$CIFRADO"
   echo "Cifrado en $CIFRADO. Este archivo sí se puede versionar."
 }
@@ -100,7 +112,7 @@ descifrar() {
   local clave valor
   while IFS='=' read -r clave valor; do
     [ -z "$clave" ] && continue
-    if printf '%s\n' "${NOMBRES[@]}" | grep -qx "$clave"; then escribir "$clave" "$valor"
+    if printf '%s\n' "${NOMBRES[@]}" "${EXTERNOS[@]}" | grep -qx "$clave"; then escribir "$clave" "$valor"
     else echo "Ignorando clave desconocida: $clave" >&2
     fi
   done < <(sops decrypt --input-type dotenv --output-type dotenv "$CIFRADO")
@@ -108,10 +120,26 @@ descifrar() {
   echo "Secretos recreados en $DIR/."
 }
 
+guardar() { # nombre
+  local nombre=${1:-}
+  printf '%s\n' "${EXTERNOS[@]}" | grep -qx -- "$nombre" \
+    || { echo "Uso: $0 guardar <nombre>. Nombres válidos: ${EXTERNOS[*]}" >&2; exit 1; }
+  [ -t 0 ] || { echo "Corre este comando en una terminal: el valor se escribe a mano, nunca por argumento ni tubería." >&2; exit 1; }
+  local valor
+  # -s: no se muestra al escribirlo ni queda en el historial de la terminal.
+  IFS= read -rs -p "Pega el valor de $nombre y presiona Enter (no se verá): " valor; echo
+  valor=$(printf '%s' "$valor" | tr -d '[:space:]')
+  [ -n "$valor" ] || { echo "Valor vacío: no se guardó nada." >&2; exit 1; }
+  preparar_dir
+  escribir "$nombre" "$valor"
+  echo "Guardado en $DIR/$nombre (${#valor} caracteres). Corre './scripts/secretos.sh cifrar' para respaldarlo cifrado."
+}
+
 case "${1:-}" in
   generar) generar ;;
   llave) llave ;;
   cifrar) cifrar ;;
   descifrar) descifrar ;;
-  *) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  guardar) guardar "${2:-}" ;;
+  *) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

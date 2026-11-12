@@ -59,6 +59,7 @@ Este repositorio es público y no contiene ninguna contraseña ni API key en tex
 
 - Las contraseñas de desarrollo viven en `secrets/` (ignorada por git). En el repo solo está `secrets.enc.env`, cifrado con age.
 - La API key del modelo vive en `dotnet user-secrets`, fuera de la carpeta del proyecto.
+- La API key de embeddings (Voyage AI, [ADR-007](docs/decisiones/ADR-007-proveedor-de-embeddings.md)) se guarda con `./scripts/secretos.sh guardar voyage_api_key`, que la pide sin mostrarla en pantalla. Es opcional: sin ella, la búsqueda usa texto en vez de significado.
 - Un hook de pre-commit con [gitleaks](https://github.com/gitleaks/gitleaks) bloquea cualquier commit que traiga un secreto. Se activa una vez por clon:
 
   ```bash
