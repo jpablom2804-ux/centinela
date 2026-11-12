@@ -14,6 +14,7 @@ Núcleo de la mesa de servicio, en Java 25 y Spring Boot 4: tickets, SLA y audit
 - **Dos roles de base de datos:** las migraciones corren aparte con el rol dueño (perfil `migracion`) y la app con `mesa_servicio_app`, que nunca recibe el secreto del dueño (A14). Sobre la bitácora, la app solo tiene `SELECT` e `INSERT`: lo prueba `BitacoraTest` contra PostgreSQL real.
 - **Ticket ajeno e inexistente responden igual:** el mismo `404`, el mismo cuerpo y una sola consulta.
 - **Un DTO por acción:** un campo de más (por ejemplo `prioridad` al crear) es un `400` (A6). Hay largos máximos en todo el texto (A4).
+- **Límite por persona (A5):** 20 tickets por hora, contados en la base para que valga con varias réplicas; el siguiente recibe `429`.
 - **Toda acción va a la bitácora en la misma transacción,** incluidas las pausas del SLA.
 
 ## Cómo correrlo
@@ -56,7 +57,7 @@ curl -u "solicitante1:$P" -H "Content-Type: application/json" \
 ./mvnw -B verify
 ```
 
-Son 35 pruebas, entre ellas:
+Son 36 pruebas, entre ellas:
 - **Unitarias:** transiciones y calendario laboral (fines de semana, feriados y cambio de día en UTC).
 - **Límites entre módulos:** la verificación de Spring Modulith.
 - **Integración con PostgreSQL real (Testcontainers):** usa el mismo script de init del proyecto, Flyway corre con el rol dueño y la app con el suyo. Cubren la API, la bitácora y el vigilante de SLA, este último con un reloj que se puede mover.

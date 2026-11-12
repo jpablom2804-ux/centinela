@@ -12,4 +12,7 @@ interface TicketRepositorio extends JpaRepository<Ticket, UUID> {
     Optional<Ticket> findByIdAndSolicitante(UUID id, String solicitante);
 
     Page<Ticket> findBySolicitante(String solicitante, Pageable pagina);
+
+    /** A5: tickets creados por el usuario desde un instante (usa el índice por solicitante y fecha). */
+    long countBySolicitanteAndCreadoEnAfter(String solicitante, java.time.Instant desde);
 }

@@ -59,6 +59,9 @@ centinela:
       fin: "17:00"
       dias: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY]
       feriados: []
+  tickets:
+    # A5: tickets que una misma persona puede crear por hora (además del rate limiting por IP de nginx).
+    max-por-hora: 20
   usuarios-prueba:
     password: ${usuarios_prueba_password:}
     usuarios: []

@@ -143,4 +143,24 @@ class TicketsApiTest extends PruebaIntegracion {
         var id = crearTicket("solicitante1");
         cambiarEstado("coordinador1", id, "resuelto", null, 409);
     }
+
+    @Autowired RelojMovible reloj;
+
+    @Test
+    void un_usuario_no_puede_crear_mas_de_20_tickets_por_hora() throws Exception {
+        // A5: límite por persona, contado en la base (vale con varias réplicas). Una hora limpia para empezar.
+        reloj.fijar(java.time.Instant.parse("2027-03-01T15:00:00Z"));
+        for (var i = 0; i < 20; i++) {
+            crearTicket("solicitante2");
+        }
+
+        como("solicitante2", post("/api/tickets").content(TICKET))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.codigo").value("LIMITE_EXCEDIDO"));
+        // El límite es por usuario: otro solicitante sigue pudiendo crear.
+        crearTicket("solicitante1");
+
+        reloj.avanzar(java.time.Duration.ofMinutes(61));
+        crearTicket("solicitante2");
+    }
 }

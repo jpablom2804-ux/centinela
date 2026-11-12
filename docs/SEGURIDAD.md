@@ -107,6 +107,8 @@ Origen: A1–A13 salieron de la revisión propia. A14–A28 los encontró un rev
 
 **Estado (2026-11-12):** corregidos en el agente A1 (su parte: normalización, conteo de dígitos, credenciales, códigos e IP), A15 (su parte: validador), A16, A17, A18, A26, A27 y A28, cada uno con su caso (19, 30, 31, 32, 33, 38 y 39) en `tests/adversarial/`. Pendiente en fases siguientes: A1 en `mesa-servicio` con el corpus de evasiones compartido (fase 3), A15 en el corpus de similares (fase 3) y la pausa global tras N errores de saldo seguidos de A18 (fase 3, en el worker).
 
+**Estado de la fase 2 (2026-11-12):** en `mesa-servicio` quedan cubiertos A4 (largos máximos validados en la API), A5 (20 tickets por hora por usuario, contados en la base), A6 (un DTO por acción; un campo de más es `400`), A14 (las migraciones corren aparte con el perfil `migracion` y el rol dueño; la app nunca recibe ese secreto) y la parte de A8 que corresponde a la fase 2 (bitácora encadenada con hash y su verificación; la app recibe `permission denied` en `UPDATE`, `DELETE` y `TRUNCATE`). De A8 falta la verificación periódica, la copia externa (fases 6 y 8) y registrar los `403` y `404` repetidos.
+
 ## Suite adversaria (`tests/adversarial/`)
 
 Cada caso es un archivo con la entrada, el ataque y el resultado esperado. Los 5 primeros son de la fase 1.

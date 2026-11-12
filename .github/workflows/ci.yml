@@ -66,3 +66,19 @@ jobs:
       # Incluye las pruebas con PostgreSQL real (Testcontainers): el runner trae Docker.
       - name: Pruebas
         run: ./mvnw -B verify
+
+  generador:
+    name: generador (Java)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/generador
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - name: Pruebas
+        run: ./mvnw -B verify

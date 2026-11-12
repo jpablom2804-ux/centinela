@@ -32,21 +32,26 @@ class ServicioTickets {
     private final RegistroAuditoria auditoria;
     private final ApplicationEventPublisher eventos;
     private final Clock reloj;
+    private final LimitesTickets limites;
 
     ServicioTickets(TicketRepositorio tickets, ComentarioRepositorio comentarios, RegistroAuditoria auditoria,
-            ApplicationEventPublisher eventos, Clock reloj) {
+            ApplicationEventPublisher eventos, Clock reloj, LimitesTickets limites) {
         this.tickets = tickets;
         this.comentarios = comentarios;
         this.auditoria = auditoria;
         this.eventos = eventos;
         this.reloj = reloj;
+        this.limites = limites;
     }
 
-    // [FLUJO CREAR_TICKET 2] Valida el rol, crea el ticket en estado nuevo con prioridad inicial → paso 3 (bitácora) y 4 (evento)
+    // [FLUJO CREAR_TICKET 2] Valida el rol y el límite por usuario (A5), crea el ticket en estado nuevo → paso 3 (bitácora) y 4 (evento)
     @Transactional
     Dtos.TicketVista crear(UsuarioActual usuario, Dtos.CrearTicket datos) {
         exigirAlguno(usuario, Rol.SOLICITANTE, Rol.TECNICO, Rol.COORDINADOR);
         var ahora = reloj.instant();
+        if (tickets.countBySolicitanteAndCreadoEnAfter(usuario.id(), ahora.minus(java.time.Duration.ofHours(1))) >= limites.maxPorHora()) {
+            throw new Errores.LimiteExcedido("Superaste el máximo de " + limites.maxPorHora() + " tickets por hora. Intenta más tarde.");
+        }
         var ticket = tickets.save(Ticket.crear(datos.tipo(), datos.titulo(), datos.descripcion(), datos.sistemaReportado(),
                 datos.canal(), usuario.id(), ahora));
         // [FLUJO CREAR_TICKET 3] Registra la creación en la bitácora de solo inserción → RegistroAuditoria.registrar

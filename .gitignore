@@ -23,3 +23,6 @@ dist/
 
 # Graphify (local, se regenera)
 graphify-out/
+
+# Artefactos generados (Spring Modulith)
+build/

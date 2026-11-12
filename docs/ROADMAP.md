@@ -39,8 +39,10 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [x] Módulo `auditoria`: bitácora de solo inserción y encadenada con hash (A8), con un test que prueba que la app no puede hacer `UPDATE`, `DELETE` ni `TRUNCATE`
 - [x] Roles y control de acceso por recurso (todavía sin Keycloak: usuarios de prueba); ticket ajeno e inexistente con el mismo `404`
 - [x] Tests de transiciones de estado y de relojes de SLA con casos límite (pausas, fines de semana, feriados, cambio de día en UTC)
-- [ ] `generador`: crea tickets sintéticos por la API
-- [ ] Límite de tickets por usuario en `mesa-servicio` (A5)
+- [x] `generador` (`tools/generador`): crea tickets sintéticos por la API, reproducibles con una semilla, y respeta el límite por usuario
+- [x] Límite de tickets por usuario en `mesa-servicio` (A5): 20 por hora, contado en la base
+
+**Cerrada el 2026-11-12:** el generador creó 39 tickets por la API, cada uno con su reloj de SLA corriendo y su registro en la bitácora, y el límite cortó a cada usuario en 20.
 
 **Hecho cuando:** se crean tickets por la API, los relojes de SLA corren y cada acción aparece en la bitácora.
 

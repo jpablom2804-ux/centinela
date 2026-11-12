@@ -29,6 +29,11 @@ class ManejadorErrores {
         return respuesta(HttpStatus.FORBIDDEN, "ACCION_NO_PERMITIDA", e.getMessage());
     }
 
+    @ExceptionHandler(Errores.LimiteExcedido.class)
+    ResponseEntity<ErrorApi> limite(Errores.LimiteExcedido e) {
+        return respuesta(HttpStatus.TOO_MANY_REQUESTS, "LIMITE_EXCEDIDO", e.getMessage());
+    }
+
     @ExceptionHandler(Errores.ReglaDeNegocio.class)
     ResponseEntity<ErrorApi> regla(Errores.ReglaDeNegocio e) {
         return respuesta(HttpStatus.CONFLICT, e.codigo(), e.getMessage());

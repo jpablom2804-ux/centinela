@@ -22,6 +22,13 @@ public final class Errores {
         }
     }
 
+    /** El usuario superó un límite de uso (A5). Se responde 429. */
+    public static final class LimiteExcedido extends RuntimeException {
+        public LimiteExcedido(String mensaje) {
+            super(mensaje);
+        }
+    }
+
     /** La acción contradice una regla del dominio (transición inválida, falta justificación…). */
     public static final class ReglaDeNegocio extends RuntimeException {
         private final String codigo;
