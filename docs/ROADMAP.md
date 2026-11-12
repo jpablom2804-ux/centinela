@@ -12,18 +12,20 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 **Hecho cuando:** `docker compose up` levanta Postgres y RabbitMQ sanos, y no hay secretos versionados.
 
 ## Fase 1 — El agente desde cero (C#, consola)  ← se manda al profesor
-- [ ] Proyecto .NET con la estructura de `docs/ARQUITECTURA.md`
-- [ ] Cliente HTTP a la API del modelo, hecho a mano con `HttpClient`. Modelo por configuración; API key con `dotnet user-secrets` en desarrollo y desde archivo (`AddKeyPerFile`) en contenedor, nunca en variables de entorno
-- [ ] Ciclo del agente: mensaje → el modelo pide una herramienta → se ejecuta → se devuelve el resultado → repetir hasta respuesta final
-- [ ] 3 herramientas de solo lectura sobre datos en memoria: `buscar_tickets_similares`, `buscar_articulos_conocimiento`, `consultar_estado_servicio`. Búsqueda simple por palabras clave (los embeddings llegan en la fase 3). Sin `ticketId` elegido por el modelo
-- [ ] Verificación de enmascarado antes de cada llamada al modelo
-- [ ] Salida JSON validada contra esquema, con los límites de largo de `docs/EVENTOS.md`; si es inválida, `estadoAnalisis = invalido`
-- [ ] Límites: iteraciones, tiempo y tokens por ticket
-- [ ] Errores de la API clasificados: saldo insuficiente o key inválida → sin reintentos, triaje manual y alerta; `429`, saturación y `5xx` → backoff con máximo
-- [ ] Registro de tokens, iteraciones y duración
-- [ ] Tests unitarios del ciclo con un `IClienteLlm` falso (sin gastar tokens)
-- [ ] Primeros 5 casos adversarios (`docs/SEGURIDAD.md`) pasando
-- [ ] README de la fase con un ejemplo de entrada y salida, y qué se aprendió
+- [x] Proyecto .NET con la estructura de `docs/ARQUITECTURA.md`
+- [x] Cliente HTTP a la API del modelo, hecho a mano con `HttpClient`. Modelo por configuración; API key con `dotnet user-secrets` en desarrollo y desde archivo (`AddKeyPerFile`) en contenedor, nunca en variables de entorno
+- [x] Ciclo del agente: mensaje → el modelo pide una herramienta → se ejecuta → se devuelve el resultado → repetir hasta respuesta final
+- [x] 3 herramientas de solo lectura sobre datos en memoria: `buscar_tickets_similares`, `buscar_articulos_conocimiento`, `consultar_estado_servicio`. Búsqueda simple por palabras clave (los embeddings llegan en la fase 3). Sin `ticketId` elegido por el modelo
+- [x] Verificación de enmascarado antes de cada llamada al modelo
+- [x] Salida JSON validada contra esquema, con los límites de largo de `docs/EVENTOS.md`; si es inválida, `estadoAnalisis = invalido`
+- [x] Límites: iteraciones, tiempo y tokens por ticket
+- [x] Errores de la API clasificados: saldo insuficiente o key inválida → sin reintentos, triaje manual y alerta; `429`, saturación y `5xx` → backoff con máximo
+- [x] Registro de tokens, iteraciones y duración
+- [x] Tests unitarios del ciclo con un `IClienteLlm` falso (sin gastar tokens)
+- [x] Primeros 5 casos adversarios (`docs/SEGURIDAD.md`) pasando con el modelo falso
+- [ ] Casos 1 y 2 de la suite adversaria contra el modelo real (necesita API key)
+- [ ] Primera corrida real: `dotnet run -- ejemplos/ticket.json` (necesita API key)
+- [x] README de la fase con un ejemplo de entrada y salida, y qué se aprendió
 
 **Hecho cuando:** `dotnet run -- ticket.json` devuelve un triaje válido, los tests pasan y la suite adversaria básica está en verde.
 

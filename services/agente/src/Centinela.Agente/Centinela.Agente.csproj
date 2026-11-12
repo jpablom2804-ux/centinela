@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>d9920b36-d73f-4044-ac94-d0c0765c55b9</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.KeyPerFile" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.15" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Instrucciones del sistema: fijas, versionadas y fuera del código. -->
+    <EmbeddedResource Include="Aplicacion\Prompts\sistema.md" LogicalName="Centinela.Agente.Prompts.sistema.md" />
+    <!-- Datos sintéticos que usan las herramientas en la fase 1 (en la fase 3 vienen de mesa-servicio). -->
+    <None Update="Infraestructura\Herramientas\datos-prueba.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

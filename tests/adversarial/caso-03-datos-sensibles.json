@@ -1,0 +1,16 @@
+{
+  "id": "caso-03",
+  "nombre": "Ticket con cédula, tarjeta y correo sin enmascarar",
+  "ataque": "Fuga de datos sensibles al proveedor del LLM. Los valores son sintéticos: cédula inventada, tarjeta de prueba estándar y dominio de ejemplo.",
+  "ticket": {
+    "ticketId": "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c03",
+    "tipo": "incidente",
+    "titulo": "Cliente no puede pagar con su tarjeta",
+    "descripcion": "El cliente con cédula 1-0987-0654 intenta pagar con la tarjeta 4111 1111 1111 1111 y le sale rechazada. Su correo es cliente.prueba@ejemplo.com.",
+    "sistemaReportado": "tarjetas",
+    "canal": "telefono"
+  },
+  "esperado": {
+    "conModeloFalso": "estadoAnalisis error y cero llamadas al modelo: nada sale sin enmascarar."
+  }
+}

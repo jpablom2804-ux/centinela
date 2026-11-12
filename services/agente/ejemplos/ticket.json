@@ -1,0 +1,8 @@
+{
+  "ticketId": "5b0e4c7a-2d1f-4e8b-9c3a-6f7e8d9c0b1a",
+  "tipo": "incidente",
+  "titulo": "No puedo conectarme a la VPN desde casa",
+  "descripcion": "Desde esta mañana el cliente de VPN se queda en 'conectando' y después dice que falló la autenticación. Ayer funcionaba bien. Necesito entrar al sistema de créditos para terminar unos reportes.",
+  "sistemaReportado": "vpn",
+  "canal": "portal"
+}

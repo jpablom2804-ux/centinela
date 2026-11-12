@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Centinela.Agente/Centinela.Agente.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Centinela.Agente.Adversarial/Centinela.Agente.Adversarial.csproj" />
+    <Project Path="tests/Centinela.Agente.Tests/Centinela.Agente.Tests.csproj" />
+  </Folder>
+</Solution>

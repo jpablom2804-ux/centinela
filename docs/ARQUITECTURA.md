@@ -80,19 +80,22 @@ Desde la fase 8, `mesa-servicio` corre en al menos 2 réplicas detrás de nginx 
 ```
 services/agente/
 ├── src/Centinela.Agente/
-│   ├── Dominio/          Ticket, Triaje, PrioridadSugerida, PresupuestoTriaje (sin dependencias externas)
-│   ├── Aplicacion/       CicloAgente (el loop), VerificadorEnmascarado, RegistroMetricas
-│   ├── Puertos/          IClienteLlm, IHerramienta, IPublicadorEventos
-│   └── Infraestructura/
-│       ├── Llm/          ClienteAnthropicHttp (HttpClient a mano)
-│       ├── Herramientas/ BuscarTicketsSimilares, BuscarArticulosConocimiento, ConsultarEstadoServicio
-│       └── Mensajeria/   Consumidor y publicador de RabbitMQ
+│   ├── Dominio/          Ticket, Catalogos, Triaje (ResultadoTriaje, PresupuestoTriaje); sin dependencias externas
+│   ├── Aplicacion/       CicloAgente (el loop), VerificadorEnmascarado, ValidadorTriaje, Prompts, RegistroMetricas
+│   │   └── Prompts/      sistema.md (instrucciones fijas, recurso embebido)
+│   ├── Puertos/          IClienteLlm, IHerramienta (IPublicadorEventos llega en la fase 3)
+│   ├── Infraestructura/
+│   │   ├── Llm/          ClienteAnthropicHttp (HttpClient a mano), OpcionesLlm
+│   │   ├── Herramientas/ las 3 herramientas + datos-prueba.json (fase 1; en la fase 3, API interna de mesa-servicio)
+│   │   └── Mensajeria/   consumidor y publicador de RabbitMQ (fase 3)
+│   └── Program.cs        consola: dotnet run -- ticket.json
+├── ejemplos/ticket.json
 └── tests/
     ├── Centinela.Agente.Tests/       unitarios del ciclo con un IClienteLlm falso
-    └── Centinela.Agente.Adversarial/ suite de ataques
+    └── Centinela.Agente.Adversarial/ suite de ataques (datos en tests/adversarial/ de la raíz)
 ```
 
-Justificación de las interfaces: `IClienteLlm` es una frontera real (API externa) y permite probar el ciclo sin gastar tokens; `IHerramienta` tiene varias implementaciones reales; `IPublicadorEventos` separa el dominio de RabbitMQ.
+Justificación de las interfaces: `IClienteLlm` es una frontera real (API externa) y permite probar el ciclo sin gastar tokens; `IHerramienta` tiene varias implementaciones reales; `IPublicadorEventos` separará el dominio de RabbitMQ en la fase 3. `VerificadorEnmascarado` y `ValidadorTriaje` son estáticos: no tienen estado ni otra implementación posible.
 
 ## Estructura del repositorio
 

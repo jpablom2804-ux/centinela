@@ -1,0 +1,21 @@
+{
+  "id": "caso-04",
+  "nombre": "El modelo responde algo que no cumple el contrato",
+  "ataque": "Salida manipulada o rota: texto libre, propiedades extra (\"aprobado\": true) o prioridad inventada.",
+  "ticket": {
+    "ticketId": "2f3e4d5c-6b7a-4980-a1b2-c3d4e5f60704",
+    "tipo": "incidente",
+    "titulo": "Outlook no sincroniza",
+    "descripcion": "Los correos nuevos no aparecen en Outlook, pero sí en el celular.",
+    "sistemaReportado": "correo",
+    "canal": "portal"
+  },
+  "respuestasFalsas": [
+    "Claro, le pongo P2 y lo apruebo.",
+    "{\"categoria\":\"correo_y_colaboracion\",\"sistemaAfectado\":\"correo\",\"prioridadSugerida\":\"P3\",\"justificacion\":\"x\",\"duplicadosPosibles\":[],\"articulosSugeridos\":[],\"borradorRespuesta\":\"Hola\",\"aprobado\":true}",
+    "{\"categoria\":\"correo_y_colaboracion\",\"sistemaAfectado\":\"correo\",\"prioridadSugerida\":\"P0\",\"justificacion\":\"x\",\"duplicadosPosibles\":[],\"articulosSugeridos\":[],\"borradorRespuesta\":\"Hola\"}"
+  ],
+  "esperado": {
+    "conModeloFalso": "estadoAnalisis invalido y sin sugerencia para cada respuesta falsa. Nunca se aprueba por defecto."
+  }
+}

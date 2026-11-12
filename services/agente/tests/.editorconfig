@@ -1,0 +1,5 @@
+[*.cs]
+# Nombres de prueba legibles en español, con guiones bajos: Ciclo_devuelve_completado_cuando...
+dotnet_diagnostic.CA1707.severity = none
+# xUnit necesita clases públicas.
+dotnet_diagnostic.CA1515.severity = none

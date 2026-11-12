@@ -1,0 +1,138 @@
+{
+  "ticketsResueltos": [
+    {
+      "id": "TK-1001",
+      "titulo": "VPN no conecta desde casa",
+      "descripcion": "El cliente de VPN se queda en 'conectando' y luego muestra error de autenticación al trabajar desde casa.",
+      "categoria": "red_y_conectividad",
+      "sistema": "vpn",
+      "solucion": "La contraseña del directorio activo había vencido. Se restableció la contraseña y se volvió a sincronizar el token de doble factor."
+    },
+    {
+      "id": "TK-1002",
+      "titulo": "Error de certificado al conectar la VPN",
+      "descripcion": "Al abrir la VPN aparece un aviso de certificado no válido y no permite continuar.",
+      "categoria": "red_y_conectividad",
+      "sistema": "vpn",
+      "solucion": "El equipo tenía la fecha y hora desincronizadas. Se corrigió la zona horaria y se reinstaló el certificado corporativo."
+    },
+    {
+      "id": "TK-1003",
+      "titulo": "Usuario bloqueado en el directorio activo",
+      "descripcion": "No puede iniciar sesión en la computadora; el sistema indica que la cuenta está bloqueada por intentos fallidos.",
+      "categoria": "acceso_y_cuentas",
+      "sistema": "directorio_activo",
+      "solucion": "Se verificó la identidad del usuario por el procedimiento estándar y se desbloqueó la cuenta. Se recomendó revisar contraseñas guardadas en el celular."
+    },
+    {
+      "id": "TK-1004",
+      "titulo": "Outlook no sincroniza el correo",
+      "descripcion": "Los correos nuevos no llegan a Outlook en la computadora, pero sí se ven en el celular.",
+      "categoria": "correo_y_colaboracion",
+      "sistema": "correo",
+      "solucion": "El archivo de datos local estaba dañado. Se recreó el perfil de Outlook y se sincronizó de nuevo."
+    },
+    {
+      "id": "TK-1005",
+      "titulo": "Impresora del tercer piso no imprime",
+      "descripcion": "Los trabajos quedan en cola y la impresora compartida del tercer piso no imprime nada.",
+      "categoria": "hardware",
+      "sistema": "impresion",
+      "solucion": "La cola del servidor de impresión estaba detenida. Se reinició el servicio de cola y se limpiaron los trabajos atascados."
+    },
+    {
+      "id": "TK-1006",
+      "titulo": "Lentitud en el core bancario al consultar clientes",
+      "descripcion": "Las consultas de clientes en el core bancario tardan más de un minuto en toda la agencia central.",
+      "categoria": "aplicaciones_de_negocio",
+      "sistema": "core_bancario",
+      "solucion": "Un proceso de cierre se ejecutó en horario laboral y bloqueó tablas. Se reprogramó el proceso y se escaló al proveedor del core."
+    },
+    {
+      "id": "TK-1007",
+      "titulo": "Transferencias SINPE rechazadas",
+      "descripcion": "Las transferencias SINPE salientes de varios clientes quedan rechazadas con código de error del canal.",
+      "categoria": "aplicaciones_de_negocio",
+      "sistema": "sinpe",
+      "solucion": "El certificado de conexión con el canal SINPE había vencido. Se renovó con el proveedor y se reprocesaron las transferencias."
+    },
+    {
+      "id": "TK-1008",
+      "titulo": "Solicitud de acceso a carpeta compartida",
+      "descripcion": "Necesito acceso de lectura a la carpeta compartida del área de cumplimiento.",
+      "categoria": "acceso_y_cuentas",
+      "sistema": "directorio_activo",
+      "solucion": "Se pidió la aprobación de la jefatura dueña de la carpeta y se agregó al usuario al grupo de lectura."
+    },
+    {
+      "id": "TK-1009",
+      "titulo": "Correo sospechoso con enlace para validar cuenta",
+      "descripcion": "Recibí un correo que pide validar mi cuenta del banco con un enlace extraño. No hice clic.",
+      "categoria": "seguridad",
+      "sistema": "correo",
+      "solucion": "Se reportó al equipo de seguridad, se bloqueó el remitente y el dominio, y se buscaron otros destinatarios del mismo correo."
+    },
+    {
+      "id": "TK-1010",
+      "titulo": "App móvil cierra al iniciar sesión",
+      "descripcion": "Varios clientes reportan que la app móvil se cierra justo después de ingresar usuario y contraseña.",
+      "categoria": "aplicaciones_de_negocio",
+      "sistema": "app_movil",
+      "solucion": "La última versión publicada tenía un error en la pantalla de inicio. Se publicó una corrección y se avisó a los clientes."
+    }
+  ],
+  "articulos": [
+    {
+      "id": "KB-001",
+      "titulo": "Cómo restablecer la contraseña del directorio activo",
+      "contenido": "Verificar la identidad del usuario con el procedimiento estándar, restablecer la contraseña desde la consola de administración, marcar cambio obligatorio al siguiente inicio y pedir que actualice las contraseñas guardadas en otros dispositivos.",
+      "sistemas": ["directorio_activo", "vpn"]
+    },
+    {
+      "id": "KB-002",
+      "titulo": "Diagnóstico de la VPN corporativa",
+      "contenido": "Revisar que la contraseña no esté vencida, que la fecha y hora del equipo sean correctas, que el certificado corporativo esté instalado y que el token de doble factor esté sincronizado. Probar desde otra red para descartar el proveedor de internet.",
+      "sistemas": ["vpn"]
+    },
+    {
+      "id": "KB-003",
+      "titulo": "Recrear el perfil de Outlook",
+      "contenido": "Cerrar Outlook, crear un perfil nuevo desde el panel de correo, configurarlo como predeterminado y esperar la sincronización completa. Los datos están en el servidor, no se pierden.",
+      "sistemas": ["correo"]
+    },
+    {
+      "id": "KB-004",
+      "titulo": "Reiniciar la cola de impresión",
+      "contenido": "En el servidor de impresión, detener el servicio de cola, borrar los trabajos atascados y volver a iniciar el servicio. Si persiste, revisar el controlador de la impresora.",
+      "sistemas": ["impresion"]
+    },
+    {
+      "id": "KB-005",
+      "titulo": "Qué hacer ante un correo de phishing",
+      "contenido": "No abrir enlaces ni adjuntos. Usar el botón de reportar phishing, avisar a seguridad y, si se ingresaron credenciales, cambiarlas de inmediato y reportarlo como incidente de seguridad.",
+      "sistemas": ["correo"]
+    },
+    {
+      "id": "KB-006",
+      "titulo": "Escalamiento de incidentes del core bancario",
+      "contenido": "Confirmar si el problema afecta a una o varias agencias, revisar el tablero de estado, abrir caso con el proveedor del core y comunicar a las jefaturas de agencia. Es P1 si afecta la atención de clientes en varias agencias.",
+      "sistemas": ["core_bancario"]
+    }
+  ],
+  "incidentesAbiertos": [
+    {
+      "id": "INC-501",
+      "sistema": "vpn",
+      "titulo": "Intermitencia en la VPN para usuarios de un proveedor de internet",
+      "estado": "en_investigacion",
+      "desde": "2026-11-11T13:10:00Z"
+    },
+    {
+      "id": "INC-502",
+      "sistema": "banca_en_linea",
+      "titulo": "Lentitud en la consulta de movimientos",
+      "estado": "mitigado",
+      "desde": "2026-11-10T22:40:00Z"
+    }
+  ]
+}
