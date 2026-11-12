@@ -24,6 +24,7 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [x] Tests unitarios del ciclo con un `IClienteLlm` falso (sin gastar tokens)
 - [x] Primeros 5 casos adversarios (`docs/SEGURIDAD.md`) pasando con el modelo falso
 - [x] Proveedor configurable: Anthropic o compatible con OpenAI, para usar Qwen gratis en desarrollo (ADR-006)
+- [ ] Hallazgos del modelado de amenazas en el código del agente (`docs/SEGURIDAD.md`), cada uno con su caso: A1 (enmascarado normalizado y categorías nuevas), A15 (URLs y caracteres invisibles en la salida), A16 (tope de herramientas y presupuesto antes de enviar), A17 (falso positivo que aborta), A18 (errores por `type`/`code`), A26, A27 y A28
 - [ ] Casos 1 y 2 de la suite adversaria contra el modelo real (necesita API key)
 - [ ] Primera corrida real: `dotnet run -- ejemplos/ticket.json` con Qwen (necesita API key o Ollama)
 - [x] README de la fase con un ejemplo de entrada y salida, y qué se aprendió
@@ -68,6 +69,17 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [ ] Keycloak: fuerza bruta con bloqueo temporal, política de contraseñas, MFA para roles con poder, registro abierto apagado
 - [ ] `404` igual para ticket ajeno e inexistente
 - [ ] `/impeccable audit` por pantalla; critique y polish en bandeja y tablero
+
+### Calidad de la interfaz (se revisa en cada pantalla)
+- [ ] **Tokens de diseño** en `DESIGN.md` (`/impeccable init`): colores semánticos para prioridad P1–P4, SLA (en tiempo, al 75 %, vencido) y estados del ticket; espaciado, tipografía, radios y sombras. Nada de valores sueltos en los componentes
+- [ ] **Jerarquía visual:** en la bandeja manda el SLA por vencer y la prioridad; la sugerencia del agente se distingue como *sugerencia*, nunca como un dato ya aplicado
+- [ ] **Consistencia:** un solo componente compartido para la insignia de prioridad, el reloj de SLA, la tarjeta de ticket y el panel de sugerencia (`src/components`)
+- [ ] **Estados de carga:** skeletons en bandeja y tablero; el triaje es asíncrono, así que el ticket muestra "analizando…" y, si el análisis queda `invalido` o `presupuesto_agotado`, "sin sugerencia: triaje manual" (nunca un spinner eterno)
+- [ ] **Estados de la interfaz:** vacío, cargando, error, sin permiso y sesión expirada (inactividad de 15 min). "No encontrado" se ve igual para un ticket ajeno y uno inexistente
+- [ ] **Estados de interacción:** hover, `focus-visible`, activo, deshabilitado y enviando; sin doble envío. En el Kanban, soltar en una columna que llegó a su límite de trabajo en curso se rechaza y se explica por qué
+- [ ] **Accesibilidad (WCAG 2.2 AA):** Kanban operable con teclado (acción "mover a…", no solo arrastrar); prioridad y SLA nunca solo por color; avisos con `aria-live`; `prefers-reduced-motion`; contraste verificado. El texto del modelo se muestra como texto plano
+- [ ] **Responsive:** el portal del solicitante se diseña primero para móvil; la bandeja y el tablero, primero para escritorio, y en móvil el Kanban pasa a pestañas por columna. Sin scroll horizontal de la página
+- [ ] Los borradores de tickets no se guardan en `localStorage` (pueden llevar datos sensibles antes de enmascararse)
 
 **Hecho cuando:** un solicitante reporta, un técnico ve la sugerencia del agente, la corrige y mueve el ticket en el tablero.
 
