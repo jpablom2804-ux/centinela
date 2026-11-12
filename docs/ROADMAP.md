@@ -24,7 +24,7 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [x] Tests unitarios del ciclo con un `IClienteLlm` falso (sin gastar tokens)
 - [x] Primeros 5 casos adversarios (`docs/SEGURIDAD.md`) pasando con el modelo falso
 - [x] Proveedor configurable: Anthropic o compatible con OpenAI, para usar Qwen gratis en desarrollo (ADR-006)
-- [ ] Hallazgos del modelado de amenazas en el código del agente (`docs/SEGURIDAD.md`), cada uno con su caso: A1 (enmascarado normalizado y categorías nuevas), A15 (URLs y caracteres invisibles en la salida), A16 (tope de herramientas y presupuesto antes de enviar), A17 (falso positivo que aborta), A18 (errores por `type`/`code`), A26, A27 y A28
+- [x] Hallazgos del modelado de amenazas en el código del agente (`docs/SEGURIDAD.md`), cada uno con su caso: A1 (enmascarado normalizado y categorías nuevas), A15 (URLs y caracteres invisibles en la salida), A16 (tope de herramientas y presupuesto antes de enviar), A17 (falso positivo que aborta), A18 (errores por `type`/`code`), A26, A27 y A28
 - [ ] Casos 1 y 2 de la suite adversaria contra el modelo real (necesita API key)
 - [ ] Primera corrida real: `dotnet run -- ejemplos/ticket.json` con Qwen (necesita API key o Ollama)
 - [x] README de la fase con un ejemplo de entrada y salida, y qué se aprendió

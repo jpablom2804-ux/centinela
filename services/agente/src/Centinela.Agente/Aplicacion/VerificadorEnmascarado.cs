@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace Centinela.Agente.Aplicacion;
@@ -6,6 +10,8 @@ namespace Centinela.Agente.Aplicacion;
 /// Segunda barrera antes del LLM: mesa-servicio ya enmascaró, pero el agente vuelve a revisar
 /// todo lo que va a enviar. Es conservador a propósito: ante la duda, no se llama al modelo.
 /// Devuelve solo el tipo de dato encontrado, nunca el valor (no debe terminar en logs).
+/// Para no depender del formato (A1), primero normaliza el texto y después busca por cantidad
+/// de dígitos en una ventana, no por patrones exactos.
 /// </summary>
 public static partial class VerificadorEnmascarado
 {
@@ -14,34 +20,113 @@ public static partial class VerificadorEnmascarado
     public const string Tarjeta = "TARJETA";
     public const string Cedula = "CEDULA";
     public const string Telefono = "TELEFONO";
+    public const string Credencial = "CREDENCIAL";
+    public const string Codigo = "CODIGO";
+    public const string Ip = "IP";
 
     public static IReadOnlySet<string> Detectar(string texto)
     {
         ArgumentNullException.ThrowIfNull(texto);
+        var normalizado = Normalizar(texto);
         var encontrados = new HashSet<string>(StringComparer.Ordinal);
 
-        if (PatronCorreo().IsMatch(texto)) encontrados.Add(Correo);
-        if (PatronIban().IsMatch(texto)) encontrados.Add(Cuenta);
+        if (PatronCorreo().IsMatch(normalizado)) encontrados.Add(Correo);
+        if (PatronIban().IsMatch(normalizado)) encontrados.Add(Cuenta);
+        if (PatronCredencial().IsMatch(normalizado)) encontrados.Add(Credencial);
+        if (PatronCodigo().IsMatch(normalizado)) encontrados.Add(Codigo);
+        if (PatronIp().IsMatch(normalizado)) encontrados.Add(Ip);
 
-        foreach (Match m in PatronSecuenciaLarga().Matches(texto))
+        foreach (Match m in PatronDigitos().Matches(normalizado))
         {
-            encontrados.Add(EsLuhnValido(m.Value) ? Tarjeta : Cuenta);
+            if (EsFecha(m.Value) || EsMonto(normalizado, m.Index)) continue;
+            var tipo = Clasificar(m.Value);
+            if (tipo is not null) encontrados.Add(tipo);
         }
 
-        if (PatronCedulaFisica().IsMatch(texto) || PatronCedulaJuridica().IsMatch(texto) || PatronDimex().IsMatch(texto))
-        {
-            encontrados.Add(Cedula);
-        }
-
-        if (PatronTelefono().IsMatch(texto)) encontrados.Add(Telefono);
         return encontrados;
+    }
+
+    /// <summary>
+    /// Revisa un resultado de herramienta. Si es JSON, revisa cada texto ya decodificado: el serializador
+    /// escapa caracteres (１…) y un dato no debe esconderse detrás de un escape.
+    /// </summary>
+    public static IReadOnlySet<string> DetectarEnContenido(string contenido)
+    {
+        ArgumentNullException.ThrowIfNull(contenido);
+        JsonNode? raiz;
+        try
+        {
+            raiz = JsonNode.Parse(contenido);
+        }
+        catch (JsonException)
+        {
+            return Detectar(contenido);
+        }
+
+        var encontrados = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var texto in Textos(raiz)) encontrados.UnionWith(Detectar(texto));
+        return encontrados;
+    }
+
+    /// <summary>NFKC, sin caracteres de formato invisibles (Unicode Cf) y con separadores unificados.</summary>
+    public static string Normalizar(string texto)
+    {
+        ArgumentNullException.ThrowIfNull(texto);
+        var nfkc = texto.Normalize(NormalizationForm.FormKC);
+        var limpio = new StringBuilder(nfkc.Length);
+        foreach (var original in nfkc)
+        {
+            // Con InvariantGlobalization, .NET no aplica NFKC: el ancho completo (U+FF01–U+FF5E) y los dígitos
+            // de otros alfabetos se convierten a mano a ASCII, para que "４１１１" o "＠" no pasen.
+            var c = original is >= '！' and <= '～' ? (char)(original - 0xFEE0) : original;
+            var categoria = CharUnicodeInfo.GetUnicodeCategory(c);
+            if (categoria == UnicodeCategory.Format) continue;
+            limpio.Append(categoria switch
+            {
+                UnicodeCategory.SpaceSeparator => ' ',
+                UnicodeCategory.DashPunctuation => '-',
+                UnicodeCategory.DecimalDigitNumber when !char.IsAsciiDigit(c) => (char)('0' + (int)char.GetNumericValue(c)),
+                _ => c,
+            });
+        }
+
+        return limpio.ToString();
+    }
+
+    private static IEnumerable<string> Textos(JsonNode? nodo) => nodo switch
+    {
+        JsonObject o => o.SelectMany(p => Textos(p.Value).Prepend(p.Key)),
+        JsonArray a => a.SelectMany(Textos),
+        JsonValue v when v.TryGetValue<string>(out var s) => [s],
+        JsonValue v => [v.ToJsonString()],
+        _ => [],
+    };
+
+    private static string? Clasificar(string valor)
+    {
+        var digitos = valor.Count(char.IsAsciiDigit);
+        return digitos switch
+        {
+            8 => Telefono,
+            9 or 10 or 11 or 12 => Cedula,
+            >= 13 and <= 19 => EsLuhnValido(valor) ? Tarjeta : Cuenta,
+            >= 20 => Cuenta,
+            _ => null,
+        };
+    }
+
+    private static bool EsFecha(string valor) => PatronFecha().IsMatch(valor);
+
+    // "₡12 500 000" o "USD 1 250 000" son montos, no teléfonos ni cédulas.
+    private static bool EsMonto(string texto, int inicio)
+    {
+        var antes = texto[Math.Max(0, inicio - 5)..inicio];
+        return PatronMoneda().IsMatch(antes);
     }
 
     private static bool EsLuhnValido(string valor)
     {
         var digitos = valor.Where(char.IsAsciiDigit).Select(c => c - '0').ToArray();
-        if (digitos.Length is < 13 or > 19) return false;
-
         var suma = 0;
         for (var i = 0; i < digitos.Length; i++)
         {
@@ -58,31 +143,32 @@ public static partial class VerificadorEnmascarado
         return suma % 10 == 0;
     }
 
-    [GeneratedRegex(@"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")]
+    // Correo con "@" (ya normalizado) o escrito "[at]" / "(at)" / " arroba ", con o sin dominio de nivel superior.
+    [GeneratedRegex(@"[\w.%+\-]+\s*(?:@|\[at\]|\(at\)|\sarroba\s)\s*[\w\-]+", RegexOptions.IgnoreCase)]
     private static partial Regex PatronCorreo();
 
-    // IBAN de Costa Rica: CR + 20 dígitos, con o sin separadores.
-    [GeneratedRegex(@"\bCR\d{2}(?:[ \-]?\d){18}\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"CR\s?\d{2}(?:[\s.\-/]?\d){18}", RegexOptions.IgnoreCase)]
     private static partial Regex PatronIban();
 
-    // En los patrones numéricos, (?<!\w) y (?!\w) evitan marcar números pegados a letras (0x80070005, TK-1001a).
-    // 13 a 20 dígitos seguidos (con espacios o guiones): tarjeta si pasa Luhn, si no, cuenta.
-    [GeneratedRegex(@"(?<!\w)(?:\d[ \-]?){12,19}\d(?!\w)")]
-    private static partial Regex PatronSecuenciaLarga();
+    // Secuencias de 8 o más dígitos con hasta 3 separadores entre cada uno (espacios, puntos, guiones,
+    // barras). Pegadas a letras también cuentan ("cedula1-0987-0654"): ante la duda, se marca.
+    [GeneratedRegex(@"(?<!\d)\d(?:[\s.\-/_]{0,3}\d){7,}(?!\d)")]
+    private static partial Regex PatronDigitos();
 
-    // Cédula física: 9 dígitos (1-2345-6789).
-    [GeneratedRegex(@"(?<!\w)[1-9][ \-]?\d{4}[ \-]?\d{4}(?!\w)")]
-    private static partial Regex PatronCedulaFisica();
+    [GeneratedRegex(@"^(?:\d{4}[\-/.]\d{1,2}[\-/.]\d{1,2}|\d{1,2}[\-/.]\d{1,2}[\-/.]\d{4})$")]
+    private static partial Regex PatronFecha();
 
-    // Cédula jurídica: 10 dígitos que empiezan con 3 (3-101-123456).
-    [GeneratedRegex(@"(?<!\w)3[ \-]?\d{3}[ \-]?\d{6}(?!\w)")]
-    private static partial Regex PatronCedulaJuridica();
+    [GeneratedRegex(@"(?:₡|\$|CRC|USD|colones)\s*$", RegexOptions.IgnoreCase)]
+    private static partial Regex PatronMoneda();
 
-    // DIMEX: 11 o 12 dígitos.
-    [GeneratedRegex(@"(?<!\w)\d{11,12}(?!\w)")]
-    private static partial Regex PatronDimex();
+    // "contraseña: X", "password=X" o "la clave es Abc123": hace falta ":"/"=" o un valor con dígito o símbolo,
+    // para no marcar "olvidé mi contraseña".
+    [GeneratedRegex(@"\b(?:contrase(?:ñ|n)a|password|passwd|pwd|clave|usuario y clave)\b\s*(?:[:=]\s*\S{3,}|es\s+(?=\S*?[\d_@#$%&*!?¿¡+=])\S{4,})", RegexOptions.IgnoreCase)]
+    private static partial Regex PatronCredencial();
 
-    // Teléfono de Costa Rica: 8 dígitos que empiezan de 2 a 8, con +506 opcional.
-    [GeneratedRegex(@"(?<!\w)(?:\+?506[ \-]?)?[2-8]\d{3}[ \-]?\d{4}(?!\w)")]
-    private static partial Regex PatronTelefono();
+    [GeneratedRegex(@"\b(?:pin|otp|cvv|cvc|cvv2|token|c(?:ó|o)digo\s+de\s+(?:verificaci(?:ó|o)n|seguridad|acceso)|c(?:ó|o)digo\s+(?:otp|sms))\b\D{0,30}?\d{3,8}(?!\d)", RegexOptions.IgnoreCase)]
+    private static partial Regex PatronCodigo();
+
+    [GeneratedRegex(@"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")]
+    private static partial Regex PatronIp();
 }

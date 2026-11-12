@@ -23,7 +23,28 @@ public class ClienteAnthropicHttpTests
         }
     }
 
-    private static readonly OpcionesLlm Opciones = new() { ApiKey = "clave-de-prueba", Modelo = "claude-opus-5-5" };
+    private static readonly OpcionesLlm Opciones = new() { ApiKey = "clave-de-prueba", Modelo = "claude-opus-5-5", UsarFallbackServidor = true };
+
+    [Fact]
+    public void El_modelo_de_reserva_viene_apagado_por_defecto()
+    {
+        // A27: el modelo de reserva del servidor no pasó por la suite adversaria.
+        var cliente = new ClienteAnthropicHttp(new HttpClient(), Microsoft.Extensions.Options.Options.Create(new OpcionesLlm { ApiKey = "k", Modelo = "m" }));
+
+        Assert.Null(cliente.ConstruirCuerpo(Solicitud(new MensajeUsuario("hola")))["fallbacks"]);
+    }
+
+    [Fact]
+    public async Task Una_respuesta_200_que_no_es_json_es_un_error_no_reintentable()
+    {
+        // A26: no debe escaparse una excepción sin clasificar (en la fase 3 se reintentaría y se volvería a pagar).
+        var (cliente, _) = Crear(HttpStatusCode.OK, "<html>proxy</html>");
+
+        var error = await Assert.ThrowsAsync<ErrorLlmException>(() => cliente.EnviarAsync(Solicitud(new MensajeUsuario("hola")), CancellationToken.None));
+
+        Assert.False(error.Reintentable);
+        Assert.Equal("respuesta_invalida", error.CodigoApi);
+    }
 
     private static (ClienteAnthropicHttp Cliente, ManejadorFalso Manejador) Crear(HttpStatusCode codigo, string cuerpo, Action<HttpResponseMessage>? ajustar = null)
     {
@@ -113,7 +134,8 @@ public class ClienteAnthropicHttpTests
 
     [Theory]
     [InlineData(402, """{"type":"error","error":{"type":"billing_error","message":"x"}}""", TipoErrorLlm.SaldoInsuficiente, false)]
-    [InlineData(400, """{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}""", TipoErrorLlm.SaldoInsuficiente, false)]
+    // A18: el mensaje no decide la clasificación; sin código de saldo, un 400 es una petición inválida.
+    [InlineData(400, """{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}""", TipoErrorLlm.SolicitudInvalida, false)]
     [InlineData(401, """{"type":"error","error":{"type":"authentication_error","message":"x"}}""", TipoErrorLlm.Autenticacion, false)]
     [InlineData(400, """{"type":"error","error":{"type":"invalid_request_error","message":"bad"}}""", TipoErrorLlm.SolicitudInvalida, false)]
     [InlineData(429, """{"type":"error","error":{"type":"rate_limit_error","message":"x"}}""", TipoErrorLlm.LimiteTasa, true)]

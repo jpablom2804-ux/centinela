@@ -1,0 +1,14 @@
+{
+  "id": "caso-19",
+  "nombre": "Datos sensibles escritos para evadir el enmascarado",
+  "ataque": "A1: cédula pegada a una letra y con raya, tarjeta con puntos y espacios duros, teléfono en pares, correo con [at] y una contraseña pegada. Valores sintéticos.",
+  "ticket": {
+    "ticketId": "19191919-0000-4000-8000-000000000019",
+    "tipo": "incidente",
+    "titulo": "No puedo pagar",
+    "descripcion": "Mi cedula1–0987–0654, tarjeta 4111.1111 1111.1111, tel 88 88 77 77, correo cliente [at] ejemplo punto com. Mi clave es Abc#2024.",
+    "sistemaReportado": "tarjetas",
+    "canal": "telefono"
+  },
+  "esperado": { "conModeloFalso": "estadoAnalisis error y cero llamadas al modelo." }
+}

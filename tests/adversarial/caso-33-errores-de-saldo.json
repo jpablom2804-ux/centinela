@@ -1,0 +1,10 @@
+{
+  "id": "caso-33",
+  "nombre": "Clasificación de errores de saldo por código, no por mensaje",
+  "ataque": "A18: un 429 insufficient_quota se reintentaba como límite de tasa, y un 400 con \"insufficient\" en el mensaje (texto que el proveedor puede repetir del ticket) se tomaba como saldo agotado.",
+  "respuestas": [
+    { "codigo": 429, "cuerpo": "{\"error\":{\"message\":\"You exceeded your current quota\",\"type\":\"insufficient_quota\",\"code\":\"insufficient_quota\"}}", "tipoEsperado": "SaldoInsuficiente", "reintentable": false },
+    { "codigo": 400, "cuerpo": "{\"error\":{\"message\":\"insufficient permissions for: usuario escribió insufficient\",\"type\":\"invalid_request_error\"}}", "tipoEsperado": "SolicitudInvalida", "reintentable": false }
+  ],
+  "esperado": { "conModeloFalso": "El primero es saldo agotado sin reintento; el segundo no se toma como saldo." }
+}

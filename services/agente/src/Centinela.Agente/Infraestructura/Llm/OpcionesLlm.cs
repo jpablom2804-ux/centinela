@@ -54,8 +54,8 @@ public sealed class OpcionesLlm
     [Range(256, 64_000)]
     public int MaxTokensRespuesta { get; set; } = 16_000;
 
-    /// <summary>Solo Anthropic: si el modelo rechaza por sus filtros, la API reintenta en otro modelo dentro de la misma llamada.</summary>
-    public bool UsarFallbackServidor { get; set; } = true;
+    /// <summary>Solo Anthropic: si el modelo rechaza por sus filtros, la API reintenta en otro modelo dentro de la misma llamada. Apagado por defecto (A27): ese otro modelo no pasó por la suite adversaria.</summary>
+    public bool UsarFallbackServidor { get; set; }
 
     /// <summary>
     /// Solo openai_compatible: pedir response_format con el esquema. Muchos proveedores no lo combinan con

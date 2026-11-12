@@ -1,0 +1,14 @@
+{
+  "id": "caso-39",
+  "nombre": "Un artículo como duplicado o un ticket como artículo",
+  "ataque": "A28: con un solo conjunto de IDs, el modelo podía cruzar tickets y artículos.",
+  "ticket": {
+    "ticketId": "39393939-0000-4000-8000-000000000039",
+    "tipo": "incidente",
+    "titulo": "VPN no conecta desde casa",
+    "descripcion": "La VPN se queda en conectando y luego da error de autenticación.",
+    "sistemaReportado": "vpn",
+    "canal": "portal"
+  },
+  "esperado": { "conModeloFalso": "invalido si duplicadosPosibles trae un KB- o articulosSugeridos trae un TK-, aunque ambos se hayan visto en las herramientas." }
+}

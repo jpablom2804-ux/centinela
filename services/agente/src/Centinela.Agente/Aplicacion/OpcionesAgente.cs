@@ -29,4 +29,15 @@ public sealed class OpcionesAgente
     /// <summary>Si el proveedor pide esperar más que esto antes de reintentar (cuota agotada), no se reintenta.</summary>
     [Range(1, 600)]
     public int MaxEsperaReintentoSegundos { get; set; } = 30;
+
+    /// <summary>A16: llamadas a herramientas que se aceptan en una sola respuesta del modelo.</summary>
+    [Range(1, 20)]
+    public int MaxHerramientasPorRespuesta { get; set; } = 5;
+
+    /// <summary>A16: llamadas a herramientas en todo el triaje de un ticket.</summary>
+    [Range(1, 50)]
+    public int MaxHerramientasPorTicket { get; set; } = 12;
+
+    /// <summary>A15: dominios que pueden aparecer como enlace en la justificación o el borrador. Vacío = ningún enlace.</summary>
+    public List<string> DominiosPermitidos { get; set; } = [];
 }

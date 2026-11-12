@@ -90,7 +90,8 @@ public class CicloAgenteTests
         var resultado = await Fabrica.Ciclo(cliente, opciones).TriarAsync(Fabrica.TicketVpn(), CancellationToken.None);
 
         Assert.Equal(EstadoAnalisis.PresupuestoAgotado, resultado.Estado);
-        Assert.Equal(2, cliente.Solicitudes.Count);
+        // A16: la segunda petición ya no entra en el presupuesto (3.100 gastados + su tamaño estimado): ni se envía.
+        Assert.Single(cliente.Solicitudes);
     }
 
     [Fact]

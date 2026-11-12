@@ -19,11 +19,19 @@ public interface IHerramienta
 
 public sealed record ContextoHerramienta(Guid TicketId);
 
+/// <summary>Qué clase de IDs devuelve una herramienta (A28): cada lista de la sugerencia se valida contra los suyos.</summary>
+public enum TipoIdDevuelto
+{
+    Ninguno,
+    Ticket,
+    Articulo,
+}
+
 /// <summary>
 /// <paramref name="IdsDevueltos"/> son los tickets o artículos que la herramienta mostró: el modelo
-/// solo puede sugerir IDs que vio en esta conversación.
+/// solo puede sugerir IDs que vio en esta conversación, y de la clase que corresponde.
 /// </summary>
-public sealed record ResultadoEjecucion(string Contenido, bool EsError, IReadOnlyCollection<string> IdsDevueltos)
+public sealed record ResultadoEjecucion(string Contenido, bool EsError, IReadOnlyCollection<string> IdsDevueltos, TipoIdDevuelto TipoIds = TipoIdDevuelto.Ninguno)
 {
     public static ResultadoEjecucion Error(string mensaje) => new(mensaje, EsError: true, []);
 }

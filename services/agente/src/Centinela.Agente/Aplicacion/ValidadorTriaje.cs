@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Centinela.Agente.Dominio;
 
 namespace Centinela.Agente.Aplicacion;
@@ -10,10 +11,16 @@ public sealed record ResultadoValidacion(TriajeSugerido? Sugerencia, IReadOnlyLi
 }
 
 /// <summary>
+/// IDs que las herramientas mostraron en esta conversación, separados por tipo (A28): un artículo no
+/// puede sugerirse como duplicado ni un ticket como artículo.
+/// </summary>
+public sealed record IdsVistos(IReadOnlySet<string> Tickets, IReadOnlySet<string> Articulos);
+
+/// <summary>
 /// Valida la respuesta final del modelo. El esquema de la API garantiza la forma, pero no los
 /// largos ni que los IDs existan: eso se revisa aquí. Si algo falla, el triaje es inválido.
 /// </summary>
-public static class ValidadorTriaje
+public static partial class ValidadorTriaje
 {
     private static readonly string[] Propiedades =
     [
@@ -40,9 +47,10 @@ public static class ValidadorTriaje
     };
 
     // [FLUJO TRIAJE_AGENTE 7] Valida el JSON final contra catálogos, largos e IDs vistos → completado o invalido
-    public static ResultadoValidacion Validar(string texto, IReadOnlySet<string> idsPermitidos)
+    public static ResultadoValidacion Validar(string texto, IdsVistos vistos, IReadOnlyCollection<string>? dominiosPermitidos = null)
     {
-        ArgumentNullException.ThrowIfNull(idsPermitidos);
+        ArgumentNullException.ThrowIfNull(vistos);
+        var dominios = dominiosPermitidos ?? [];
         JsonElement raiz;
         try
         {
@@ -66,10 +74,10 @@ public static class ValidadorTriaje
         var categoria = TextoDeCatalogo(raiz, "categoria", Catalogos.Categorias, errores);
         var sistema = TextoDeCatalogo(raiz, "sistemaAfectado", Catalogos.Sistemas, errores);
         var prioridad = TextoDeCatalogo(raiz, "prioridadSugerida", Catalogos.Prioridades, errores);
-        var justificacion = TextoLibre(raiz, "justificacion", LimitesSalida.MaxJustificacion, errores);
-        var borrador = TextoLibre(raiz, "borradorRespuesta", LimitesSalida.MaxBorradorRespuesta, errores);
-        var duplicados = ListaDeIds(raiz, "duplicadosPosibles", idsPermitidos, errores);
-        var articulos = ListaDeIds(raiz, "articulosSugeridos", idsPermitidos, errores);
+        var justificacion = TextoLibre(raiz, "justificacion", LimitesSalida.MaxJustificacion, dominios, errores);
+        var borrador = TextoLibre(raiz, "borradorRespuesta", LimitesSalida.MaxBorradorRespuesta, dominios, errores);
+        var duplicados = ListaDeIds(raiz, "duplicadosPosibles", vistos.Tickets, errores);
+        var articulos = ListaDeIds(raiz, "articulosSugeridos", vistos.Articulos, errores);
 
         if (errores.Count > 0) return new(null, errores);
         return new(new TriajeSugerido(categoria!, sistema!, prioridad!, justificacion!, duplicados!, articulos!, borrador!), []);
@@ -91,7 +99,7 @@ public static class ValidadorTriaje
         return null;
     }
 
-    private static string? TextoLibre(JsonElement raiz, string nombre, int maximo, List<string> errores)
+    private static string? TextoLibre(JsonElement raiz, string nombre, int maximo, IReadOnlyCollection<string> dominios, List<string> errores)
     {
         var valor = raiz.GetProperty(nombre);
         var texto = valor.ValueKind == JsonValueKind.String ? valor.GetString()! : null;
@@ -108,8 +116,34 @@ public static class ValidadorTriaje
             return null;
         }
 
+        // A15: sin caracteres invisibles ni de control bidireccional (U+200B, U+202E…), que engañan a quien aprueba.
+        if (texto.Any(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format))
+        {
+            errores.Add($"{nombre} con caracteres invisibles o de control bidireccional");
+            return null;
+        }
+
+        // A15: ningún enlace fuera de la lista blanca (Agente:DominiosPermitidos). Un ticket envenenado no puede
+        // hacer que el borrador mande a otro usuario a un sitio de phishing.
+        foreach (Match url in PatronUrl().Matches(texto))
+        {
+            if (!DominioPermitido(url.Groups["host"].Value, dominios))
+            {
+                errores.Add($"{nombre} con un enlace fuera de la lista blanca");
+                return null;
+            }
+        }
+
         return texto;
     }
+
+    private static bool DominioPermitido(string host, IReadOnlyCollection<string> dominios) =>
+        dominios.Any(d => host.Equals(d, StringComparison.OrdinalIgnoreCase)
+                          || host.EndsWith("." + d, StringComparison.OrdinalIgnoreCase));
+
+    // Con esquema (http://, https://), con www. o un dominio con terminación conocida ("banco-seguro.com/clave").
+    [GeneratedRegex(@"(?:https?://|www\.)(?<host>[^\s/:?#)\]>""']+)|(?<![\w.@])(?<host>(?:[a-z0-9\-]+\.)+(?:com|net|org|io|co|cr|info|biz|xyz|me|app|dev|site|online|link|click|top|ly|ru|cn|tk))\b", RegexOptions.IgnoreCase)]
+    private static partial Regex PatronUrl();
 
     private static List<string>? ListaDeIds(JsonElement raiz, string nombre, IReadOnlySet<string> permitidos, List<string> errores)
     {

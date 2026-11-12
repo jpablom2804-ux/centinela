@@ -35,6 +35,6 @@ public sealed class HerramientaBuscarArticulos(RepositorioDatosPrueba repositori
             .ToList();
 
         return Task.FromResult(new ResultadoEjecucion(
-            EntradaHerramienta.Resultado(encontrados), EsError: false, encontrados.Select(e => e.id).ToList()));
+            EntradaHerramienta.Resultado(encontrados), EsError: false, encontrados.Select(e => e.id).ToList(), TipoIdDevuelto.Articulo));
     }
 }

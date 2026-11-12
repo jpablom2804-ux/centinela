@@ -24,7 +24,7 @@ Requisitos: SDK de .NET 10 (`global.json` lo fija).
 
 ```bash
 cd services/agente
-dotnet test                                                      # 84 pruebas: 82 sin gastar tokens, 2 con el modelo real (saltadas)
+dotnet test                                                      # 133 pruebas: 131 sin gastar tokens, 2 con el modelo real (saltadas)
 
 # Primera vez: la API key va como secreto, fuera del repo (ADR-005)
 dotnet user-secrets set "Llm:ApiKey" "<tu key>" --project src/Centinela.Agente
@@ -64,13 +64,16 @@ En `src/Centinela.Agente/appsettings.json`, y se puede sobrescribir con variable
 | `Llm:Proveedor` | `anthropic` | `anthropic` u `openai_compatible` (Qwen, Ollama, OpenRouter…) |
 | `Llm:Modelo` | `claude-opus-5-5` | Modelo. `claude-haiku-5-5` cuesta unas 40 veces menos: medirlo con la suite antes de cambiar |
 | `Llm:Esfuerzo` | `medium` | Profundidad del razonamiento (`low` … `max`) |
-| `Llm:UsarFallbackServidor` | `true` | Si el modelo rechaza por sus filtros, la API reintenta en otro modelo |
+| `Llm:UsarFallbackServidor` | `false` | Si el modelo rechaza por sus filtros, la API reintenta en otro modelo. Apagado: ese modelo no pasó por la suite adversaria (A27) |
 | `Agente:MaxIteraciones` | 6 | Llamadas al modelo por ticket |
 | `Agente:MaxTokensTicket` | 40000 | Tokens de entrada + salida por ticket |
 | `Agente:TimeoutSegundos` | 90 | Tiempo máximo por ticket |
 | `Agente:MaxReintentos` | 2 | Reintentos de errores `429`, `529`, `5xx`, de red y `tool_use_failed` |
 | `Agente:MaxEsperaReintentoSegundos` | 30 | Si el proveedor pide esperar más (cuota agotada), no se reintenta: triaje manual enseguida |
 | `Agente:MaxReparaciones` | 1 | Turnos de corrección si la respuesta final no valida; cuentan en el presupuesto |
+| `Agente:MaxHerramientasPorRespuesta` | 5 | Llamadas a herramientas aceptadas en una respuesta; si pide más, no se ejecuta ninguna (A16) |
+| `Agente:MaxHerramientasPorTicket` | 12 | Llamadas a herramientas en todo el triaje (A16) |
+| `Agente:DominiosPermitidos` | (vacío) | Dominios que pueden aparecer como enlace en la justificación o el borrador; vacío = ningún enlace (A15) |
 
 ## Ejemplo
 

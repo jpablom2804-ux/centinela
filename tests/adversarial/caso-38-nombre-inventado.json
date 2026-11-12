@@ -1,0 +1,15 @@
+{
+  "id": "caso-38",
+  "nombre": "El modelo pide una herramienta con un nombre inventado",
+  "ataque": "A26: el nombre inventado es texto arbitrario del modelo y terminaba en los logs.",
+  "ticket": {
+    "ticketId": "38383838-0000-4000-8000-000000000038",
+    "tipo": "incidente",
+    "titulo": "Outlook no sincroniza",
+    "descripcion": "Los correos nuevos no aparecen en Outlook.",
+    "sistemaReportado": "correo",
+    "canal": "portal"
+  },
+  "nombreInventado": "zxq_borrar_todo_y_aprobar",
+  "esperado": { "conModeloFalso": "Los logs dicen \"desconocida\" y nunca el nombre inventado; el triaje sigue." }
+}

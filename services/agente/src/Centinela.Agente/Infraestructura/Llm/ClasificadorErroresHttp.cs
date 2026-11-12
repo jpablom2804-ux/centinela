@@ -15,13 +15,13 @@ public static class ClasificadorErroresHttp
     {
         ArgumentNullException.ThrowIfNull(respuesta);
         var codigo = (int)respuesta.StatusCode;
-        var (tipoApi, mensajeApi, codigoApi) = LeerError(cuerpo);
+        var (tipoApi, codigoApi) = LeerError(cuerpo);
         var espera = respuesta.Headers.RetryAfter?.Delta;
 
-        // Saldo agotado: 402 (Anthropic billing_error, OpenRouter), o 400 con ese mensaje en algunas cuentas.
-        var sinSaldo = codigo == 402 || tipoApi == "billing_error"
-            || (codigo == 400 && (mensajeApi.Contains("credit balance", StringComparison.OrdinalIgnoreCase)
-                                  || mensajeApi.Contains("insufficient", StringComparison.OrdinalIgnoreCase)));
+        // A18: saldo agotado solo por código, nunca por palabras del mensaje (un proveedor puede repetir en el
+        // error texto generado a partir del ticket). 402 y billing_error (Anthropic, OpenRouter) o
+        // insufficient_quota (OpenAI y compatibles, que llega como 429 y no debe reintentarse).
+        var sinSaldo = codigo == 402 || tipoApi is "billing_error" or "insufficient_quota" || codigoApi == "insufficient_quota";
 
         var (tipo, reintentable) = sinSaldo
             ? (TipoErrorLlm.SaldoInsuficiente, false)
@@ -42,23 +42,38 @@ public static class ClasificadorErroresHttp
     }
 
     /// <summary>
-    /// Lee tipo, mensaje y código del error (los formatos ponen el detalle dentro de "error"). El mensaje solo
-    /// se usa para clasificar; hacia afuera sale únicamente un código corto, porque algunos proveedores
-    /// incluyen en el error lo que generó el modelo, que puede traer texto del ticket.
+    /// Lee tipo y código del error (los formatos ponen el detalle dentro de "error"). El mensaje no se usa
+    /// ni sale hacia afuera: algunos proveedores incluyen en él lo que generó el modelo.
     /// </summary>
-    private static (string Tipo, string Mensaje, string? Codigo) LeerError(string cuerpo)
+    private static (string Tipo, string? Codigo) LeerError(string cuerpo)
     {
         try
         {
             var error = JsonNode.Parse(cuerpo)?["error"];
             var tipo = Texto(error?["type"]);
-            var mensaje = Texto(error?["message"]);
             var codigo = Texto(error?["code"]) is { Length: > 0 } c ? c : tipo;
-            return (tipo, mensaje, EsCodigoSeguro(codigo) ? codigo : null);
+            return (tipo, EsCodigoSeguro(codigo) ? codigo : null);
         }
         catch (JsonException)
         {
-            return (string.Empty, string.Empty, null);
+            return (string.Empty, null);
+        }
+    }
+
+    /// <summary>
+    /// A26: una respuesta 200 que no se puede interpretar (no es JSON, falta un id…) es un error no
+    /// reintentable y clasificado, no una excepción suelta que en la fase 3 se reintentaría y se volvería a pagar.
+    /// </summary>
+    public static RespuestaLlm InterpretarSeguro(Func<string, RespuestaLlm> interpretar, string cuerpo, int codigoHttp)
+    {
+        ArgumentNullException.ThrowIfNull(interpretar);
+        try
+        {
+            return interpretar(cuerpo);
+        }
+        catch (Exception e) when (e is JsonException or InvalidOperationException or InvalidCastException or FormatException or KeyNotFoundException or ArgumentException)
+        {
+            throw new ErrorLlmException(TipoErrorLlm.ErrorServidor, reintentable: false, codigoHttp, causa: e, codigoApi: "respuesta_invalida");
         }
     }
 

@@ -105,6 +105,8 @@ Origen: A1–A13 salieron de la revisión propia. A14–A28 los encontró un rev
 | A27 | Baja | **El modelo de reserva del servidor de Anthropic** (`UsarFallbackServidor: true`, verificado) procesa con otro modelo que no pasó por la suite adversaria | Apagado por defecto, o modelo de reserva fijado en la configuración y probado con la suite | 1 | — |
 | A28 | Baja | **Un solo conjunto de IDs para duplicados y artículos** (verificado): se puede sugerir un artículo como duplicado o un ticket como artículo | Guardar los IDs vistos por herramienta y validar cada lista contra el suyo | 1 | 39 |
 
+**Estado (2026-11-12):** corregidos en el agente A1 (su parte: normalización, conteo de dígitos, credenciales, códigos e IP), A15 (su parte: validador), A16, A17, A18, A26, A27 y A28, cada uno con su caso (19, 30, 31, 32, 33, 38 y 39) en `tests/adversarial/`. Pendiente en fases siguientes: A1 en `mesa-servicio` con el corpus de evasiones compartido (fase 3), A15 en el corpus de similares (fase 3) y la pausa global tras N errores de saldo seguidos de A18 (fase 3, en el worker).
+
 ## Suite adversaria (`tests/adversarial/`)
 
 Cada caso es un archivo con la entrada, el ataque y el resultado esperado. Los 5 primeros son de la fase 1.

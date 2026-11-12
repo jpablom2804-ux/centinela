@@ -46,7 +46,7 @@ public sealed class ClienteAnthropicHttp(HttpClient http, IOptions<OpcionesLlm> 
         {
             var cuerpo = await respuesta.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             if (!respuesta.IsSuccessStatusCode) throw ClasificadorErroresHttp.Clasificar(respuesta, cuerpo);
-            return Interpretar(cuerpo);
+            return ClasificadorErroresHttp.InterpretarSeguro(Interpretar, cuerpo, (int)respuesta.StatusCode);
         }
     }
 
@@ -121,7 +121,7 @@ public sealed class ClienteAnthropicHttp(HttpClient http, IOptions<OpcionesLlm> 
         var llamadas = contenido
             .Where(b => (string?)b?["type"] == "tool_use")
             .Select(b => new LlamadaHerramienta(
-                (string)b!["id"]!,
+                (string?)b!["id"] is { Length: > 0 } id ? id : throw new InvalidOperationException("Llamada a herramienta sin id."),
                 (string)b["name"]!,
                 JsonSerializer.SerializeToElement(b["input"])))
             .ToList();

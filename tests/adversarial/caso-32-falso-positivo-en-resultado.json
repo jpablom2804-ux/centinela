@@ -1,0 +1,15 @@
+{
+  "id": "caso-32",
+  "nombre": "Un resultado de herramienta trae un código que parece un teléfono",
+  "ataque": "A17: un artículo con \"error 80070005\" haría terminar en error todos los triajes que lo recuperen.",
+  "ticket": {
+    "ticketId": "32323232-0000-4000-8000-000000000032",
+    "tipo": "incidente",
+    "titulo": "Windows Update falla",
+    "descripcion": "Las actualizaciones de Windows fallan en mi computadora.",
+    "sistemaReportado": "estaciones_de_trabajo",
+    "canal": "portal"
+  },
+  "contenidoDeHerramienta": "Se resolvió el error 80070005 dando permisos a la carpeta de actualizaciones.",
+  "esperado": { "conModeloFalso": "El resultado se omite (error para el modelo), el triaje sigue y termina completado." }
+}

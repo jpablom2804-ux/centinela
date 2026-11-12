@@ -62,6 +62,14 @@ public sealed partial class CicloAgente(
 
     private async Task<ResultadoTriaje> EjecutarAsync(Ticket ticket, PresupuestoTriaje presupuesto, EstadoCiclo estado, CancellationToken ct)
     {
+        // A1: el texto del ticket se revisa antes de serializarlo; en el JSON los caracteres salen escapados (１…).
+        var enTicket = VerificadorEnmascarado.Detectar(string.Join('\n', ticket.Titulo, ticket.Descripcion, ticket.SistemaReportado ?? string.Empty));
+        if (enTicket.Count > 0)
+        {
+            DatosSinEnmascarar(logger, ticket.TicketId, string.Join(",", enTicket.Order(StringComparer.Ordinal)));
+            return SinSugerencia(ticket, EstadoAnalisis.Error, estado);
+        }
+
         var mensajes = new List<MensajeConversacion> { new MensajeUsuario(Prompts.MensajeTicket(ticket)) };
         var definiciones = _herramientas.Values.Select(h => h.Definicion).ToList();
         var contexto = new ContextoHerramienta(ticket.TicketId);
@@ -83,13 +91,22 @@ public sealed partial class CicloAgente(
             }
 
             var solicitud = new SolicitudLlm(Prompts.Sistema, definiciones, ValidadorTriaje.Esquema(), mensajes.ToList());
-            var respuesta = await LlamarModeloAsync(solicitud, ct).ConfigureAwait(false);
+
+            // A16: el presupuesto se revisa con lo que va a costar esta petición, no solo con lo ya gastado.
+            var estimado = EstimadorTokens.Entrada(solicitud);
+            if (estado.TokensTotales + estimado > presupuesto.MaxTokens)
+            {
+                PresupuestoAgotado(logger, ticket.TicketId, "tokens (la siguiente petición no entra)");
+                return SinSugerencia(ticket, EstadoAnalisis.PresupuestoAgotado, estado);
+            }
+
+            var respuesta = await LlamarModeloAsync(solicitud, estado, estimado, presupuesto.MaxTokens, ct).ConfigureAwait(false);
             estado.Registrar(respuesta);
 
             switch (respuesta.Motivo)
             {
                 case MotivoParada.Final:
-                    var validacion = ValidadorTriaje.Validar(respuesta.Texto, estado.IdsVistos);
+                    var validacion = ValidadorTriaje.Validar(respuesta.Texto, new IdsVistos(estado.TicketsVistos, estado.ArticulosVistos), _opciones.DominiosPermitidos);
                     if (validacion.EsValido)
                     {
                         return ResultadoTriaje.Completado(ticket.TicketId, validacion.Sugerencia!, estado.Metricas(reloj));
@@ -109,6 +126,14 @@ public sealed partial class CicloAgente(
                     break;
 
                 case MotivoParada.UsoHerramientas when respuesta.Llamadas.Count > 0:
+                    // A16: una sola respuesta no puede pedir cientos de llamadas; si se pasa del tope, no se ejecuta ninguna.
+                    if (respuesta.Llamadas.Count > _opciones.MaxHerramientasPorRespuesta
+                        || estado.LlamadasHerramientas + respuesta.Llamadas.Count > _opciones.MaxHerramientasPorTicket)
+                    {
+                        PresupuestoAgotado(logger, ticket.TicketId, "llamadas a herramientas");
+                        return SinSugerencia(ticket, EstadoAnalisis.PresupuestoAgotado, estado);
+                    }
+
                     mensajes.Add(new MensajeAsistente(respuesta.ContenidoProveedor));
                     var resultados = await EjecutarHerramientasAsync(ticket.TicketId, respuesta.Llamadas, contexto, estado, ct).ConfigureAwait(false);
                     mensajes.Add(new ResultadosHerramientas(resultados));
@@ -130,7 +155,7 @@ public sealed partial class CicloAgente(
     }
 
     // [FLUJO TRIAJE_AGENTE 4] Llama al modelo; reintenta con backoff solo los errores reintentables → ClienteAnthropicHttp.EnviarAsync (paso 5)
-    private async Task<RespuestaLlm> LlamarModeloAsync(SolicitudLlm solicitud, CancellationToken ct)
+    private async Task<RespuestaLlm> LlamarModeloAsync(SolicitudLlm solicitud, EstadoCiclo estado, int estimado, int maxTokens, CancellationToken ct)
     {
         for (var intento = 0; ; intento++)
         {
@@ -140,6 +165,13 @@ public sealed partial class CicloAgente(
             }
             catch (ErrorLlmException e) when (e.Reintentable && intento < _opciones.MaxReintentos)
             {
+                // A16: si el proveedor llegó a generar (tool_use_failed), ese intento también se paga y cuenta.
+                if (e.Tipo == TipoErrorLlm.GeneracionInvalida)
+                {
+                    estado.SumarEntradaEstimada(estimado);
+                    if (estado.TokensTotales + estimado > maxTokens) throw;
+                }
+
                 var espera = e.EsperaSugerida ?? TimeSpan.FromMilliseconds(_opciones.BackoffBaseMs * Math.Pow(2, intento));
 
                 // Si el proveedor pide esperar minutos (cuota agotada), esperar solo gasta el tiempo del ticket: se corta ya.
@@ -162,10 +194,14 @@ public sealed partial class CicloAgente(
         var resultados = new List<ResultadoHerramienta>(llamadas.Count);
         foreach (var llamada in llamadas)
         {
+            estado.LlamadasHerramientas++;
             ResultadoEjecucion ejecucion;
+
+            // A26: en los logs solo nombres del catálogo; un nombre inventado por el modelo es texto no confiable.
+            var nombre = _herramientas.ContainsKey(llamada.Nombre) ? llamada.Nombre : "desconocida";
             if (!_herramientas.TryGetValue(llamada.Nombre, out var herramienta))
             {
-                ejecucion = ResultadoEjecucion.Error($"La herramienta '{llamada.Nombre}' no existe.");
+                ejecucion = ResultadoEjecucion.Error("Esa herramienta no existe. Usa solo las del catálogo.");
             }
             else
             {
@@ -177,13 +213,33 @@ public sealed partial class CicloAgente(
                 catch (Exception e) when (e is not OperationCanceledException)
 #pragma warning restore CA1031
                 {
-                    HerramientaFallo(logger, ticketId, llamada.Nombre, e.GetType().Name);
+                    HerramientaFallo(logger, ticketId, nombre, e.GetType().Name);
                     ejecucion = ResultadoEjecucion.Error("La herramienta falló. Continúa sin ese dato.");
                 }
             }
 
-            if (ejecucion.EsError) HerramientaConError(logger, ticketId, llamada.Nombre);
-            estado.IdsVistos.UnionWith(ejecucion.IdsDevueltos);
+            // A17: si un resultado trae algo que parece un dato sensible, se descarta ese resultado y el triaje sigue.
+            if (!ejecucion.EsError)
+            {
+                var datos = VerificadorEnmascarado.DetectarEnContenido(ejecucion.Contenido);
+                if (datos.Count > 0)
+                {
+                    ResultadoOmitido(logger, ticketId, nombre, string.Join(",", datos.Order(StringComparer.Ordinal)));
+                    ejecucion = ResultadoEjecucion.Error("Resultado omitido: traía datos que parecían sensibles. Continúa sin él.");
+                }
+            }
+
+            if (ejecucion.EsError) HerramientaConError(logger, ticketId, nombre);
+            switch (ejecucion.TipoIds)
+            {
+                case TipoIdDevuelto.Ticket:
+                    estado.TicketsVistos.UnionWith(ejecucion.IdsDevueltos);
+                    break;
+                case TipoIdDevuelto.Articulo:
+                    estado.ArticulosVistos.UnionWith(ejecucion.IdsDevueltos);
+                    break;
+            }
+
             resultados.Add(new ResultadoHerramienta(llamada.Id, ejecucion.Contenido, ejecucion.EsError));
         }
 
@@ -202,7 +258,7 @@ public sealed partial class CicloAgente(
                     encontrados.UnionWith(VerificadorEnmascarado.Detectar(usuario.Texto));
                     break;
                 case ResultadosHerramientas herramientas:
-                    foreach (var r in herramientas.Resultados) encontrados.UnionWith(VerificadorEnmascarado.Detectar(r.Contenido));
+                    foreach (var r in herramientas.Resultados) encontrados.UnionWith(VerificadorEnmascarado.DetectarEnContenido(r.Contenido));
                     break;
             }
         }
@@ -220,9 +276,13 @@ public sealed partial class CicloAgente(
         public int TokensEntrada { get; private set; }
         public int TokensSalida { get; private set; }
         public string Modelo { get; private set; } = "sin llamada";
-        public HashSet<string> IdsVistos { get; } = new(StringComparer.Ordinal);
+        public HashSet<string> TicketsVistos { get; } = new(StringComparer.Ordinal);
+        public HashSet<string> ArticulosVistos { get; } = new(StringComparer.Ordinal);
         public int Reparaciones { get; set; }
+        public int LlamadasHerramientas { get; set; }
         public int TokensTotales => TokensEntrada + TokensSalida;
+
+        public void SumarEntradaEstimada(int tokens) => TokensEntrada += tokens;
 
         public void Registrar(RespuestaLlm respuesta)
         {
@@ -253,6 +313,9 @@ public sealed partial class CicloAgente(
 
     [LoggerMessage(EventId = 208, Level = LogLevel.Error, Message = "Ticket {TicketId}: la herramienta {Herramienta} lanzó {TipoExcepcion}")]
     private static partial void HerramientaFallo(ILogger logger, Guid ticketId, string herramienta, string tipoExcepcion);
+
+    [LoggerMessage(EventId = 210, Level = LogLevel.Warning, Message = "Ticket {TicketId}: resultado de {Herramienta} omitido por datos que parecen sensibles ({Tipos}); el triaje sigue")]
+    private static partial void ResultadoOmitido(ILogger logger, Guid ticketId, string herramienta, string tipos);
 
     [LoggerMessage(EventId = 209, Level = LogLevel.Warning, Message = "La API del modelo pide esperar {EsperaSegundos} s ({Tipo}), más que el máximo de {MaximoSegundos} s: no se reintenta")]
     private static partial void EsperaDemasiadoLarga(ILogger logger, TipoErrorLlm tipo, long esperaSegundos, int maximoSegundos);

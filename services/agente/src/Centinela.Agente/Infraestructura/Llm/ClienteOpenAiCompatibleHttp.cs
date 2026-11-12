@@ -47,7 +47,7 @@ public sealed partial class ClienteOpenAiCompatibleHttp(HttpClient http, IOption
         {
             var cuerpo = await respuesta.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             if (!respuesta.IsSuccessStatusCode) throw ClasificadorErroresHttp.Clasificar(respuesta, cuerpo);
-            return Interpretar(cuerpo);
+            return ClasificadorErroresHttp.InterpretarSeguro(Interpretar, cuerpo, (int)respuesta.StatusCode);
         }
     }
 
@@ -127,7 +127,7 @@ public sealed partial class ClienteOpenAiCompatibleHttp(HttpClient http, IOption
 
         var llamadas = (mensaje["tool_calls"] as JsonArray ?? [])
             .Select(c => new LlamadaHerramienta(
-                (string?)c?["id"] ?? string.Empty,
+                (string?)c?["id"] is { Length: > 0 } id ? id : throw new InvalidOperationException("Llamada a herramienta sin id."),
                 (string?)c?["function"]?["name"] ?? string.Empty,
                 Argumentos((string?)c?["function"]?["arguments"])))
             .ToList();

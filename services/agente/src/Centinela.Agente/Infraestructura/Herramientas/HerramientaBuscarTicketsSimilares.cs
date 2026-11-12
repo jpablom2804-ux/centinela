@@ -38,6 +38,6 @@ public sealed class HerramientaBuscarTicketsSimilares(RepositorioDatosPrueba rep
             .ToList();
 
         return Task.FromResult(new ResultadoEjecucion(
-            EntradaHerramienta.Resultado(encontrados), EsError: false, encontrados.Select(e => e.id).ToList()));
+            EntradaHerramienta.Resultado(encontrados), EsError: false, encontrados.Select(e => e.id).ToList(), TipoIdDevuelto.Ticket));
     }
 }
