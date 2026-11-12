@@ -74,7 +74,7 @@ public class ClienteOpenAiCompatibleHttpTests
         Assert.Equal("https://proveedor.ejemplo.com/v1/chat/completions", peticion.RequestUri!.ToString());
         Assert.Equal("Bearer", peticion.Headers.Authorization!.Scheme);
         Assert.Equal("qwen-de-prueba", (string?)cuerpo["model"]);
-        Assert.Equal("auto", (string?)cuerpo["tool_choice"]);
+        Assert.Null(cuerpo["tool_choice"]);
         Assert.Null(cuerpo["response_format"]);
         Assert.All(cuerpo["tools"]!.AsArray(), t => Assert.Equal("function", (string?)t!["type"]));
 
@@ -181,6 +181,16 @@ public class ClienteOpenAiCompatibleHttpTests
         var opciones = new OpcionesLlm { Proveedor = proveedor, UrlBase = new Uri(url), ApiKey = apiKey, Modelo = "m" };
 
         Assert.Contains(opciones.ErroresDeCoherencia(), e => e.Contains(errorEsperado, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("https://ollama.com/v1")]
+    [InlineData("https://ollama.com/v1/")]
+    public void La_url_base_funciona_con_o_sin_barra_final(string url)
+    {
+        var opciones = new OpcionesLlm { UrlBase = new Uri(url) };
+
+        Assert.Equal("https://ollama.com/v1/chat/completions", opciones.Endpoint("chat/completions").ToString());
     }
 
     [Fact]

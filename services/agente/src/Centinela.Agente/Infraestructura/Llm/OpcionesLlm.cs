@@ -65,6 +65,16 @@ public sealed class OpcionesLlm
 
     public bool EsLocal => UrlBase.IsLoopback;
 
+    /// <summary>
+    /// Une la URL base con la ruta del endpoint. Sin barra final, "https://ollama.com/v1" + "chat/completions"
+    /// daría "https://ollama.com/chat/completions": se agrega la barra para que funcione escrita de las dos formas.
+    /// </summary>
+    public Uri Endpoint(string ruta)
+    {
+        var baseConBarra = UrlBase.AbsoluteUri.EndsWith('/') ? UrlBase : new Uri(UrlBase.AbsoluteUri + "/");
+        return new Uri(baseConBarra, ruta);
+    }
+
     /// <summary>Reglas que dependen de varios campos; DataAnnotations no las expresa.</summary>
     public IEnumerable<string> ErroresDeCoherencia()
     {

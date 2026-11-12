@@ -20,7 +20,7 @@ public sealed partial class ClienteOpenAiCompatibleHttp(HttpClient http, IOption
     public async Task<RespuestaLlm> EnviarAsync(SolicitudLlm solicitud, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(solicitud);
-        using var peticion = new HttpRequestMessage(HttpMethod.Post, new Uri(_opciones.UrlBase, "chat/completions"))
+        using var peticion = new HttpRequestMessage(HttpMethod.Post, _opciones.Endpoint("chat/completions"))
         {
             Content = JsonContent.Create(ConstruirCuerpo(solicitud)),
         };
@@ -81,7 +81,7 @@ public sealed partial class ClienteOpenAiCompatibleHttp(HttpClient http, IOption
                     ["parameters"] = h.EsquemaEntrada.DeepClone(),
                 },
             }).ToArray()),
-            ["tool_choice"] = "auto",
+            // Sin tool_choice: "auto" ya es el comportamiento por defecto y Ollama no acepta el campo.
         };
 
         if (_opciones.UsarSalidaEstructurada)

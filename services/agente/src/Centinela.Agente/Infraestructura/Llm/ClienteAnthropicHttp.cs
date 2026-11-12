@@ -20,7 +20,7 @@ public sealed class ClienteAnthropicHttp(HttpClient http, IOptions<OpcionesLlm> 
     public async Task<RespuestaLlm> EnviarAsync(SolicitudLlm solicitud, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(solicitud);
-        using var peticion = new HttpRequestMessage(HttpMethod.Post, new Uri(_opciones.UrlBase, "v1/messages"))
+        using var peticion = new HttpRequestMessage(HttpMethod.Post, _opciones.Endpoint("v1/messages"))
         {
             Content = JsonContent.Create(ConstruirCuerpo(solicitud)),
         };

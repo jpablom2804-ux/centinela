@@ -24,7 +24,7 @@ Requisitos: SDK de .NET 10 (`global.json` lo fija).
 
 ```bash
 cd services/agente
-dotnet test                                                      # 82 pruebas: 80 sin gastar tokens, 2 con el modelo real (saltadas)
+dotnet test                                                      # 84 pruebas: 82 sin gastar tokens, 2 con el modelo real (saltadas)
 
 # Primera vez: la API key va como secreto, fuera del repo (ADR-005)
 dotnet user-secrets set "Llm:ApiKey" "<tu key>" --project src/Centinela.Agente
@@ -50,7 +50,8 @@ dotnet user-secrets set "Llm:ApiKey"    "<tu key>"          --project $P   # no 
 |---|---|---|
 | Alibaba Cloud Model Studio (internacional) | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/` | `qwen-plus` |
 | OpenRouter | `https://openrouter.ai/api/v1/` | un modelo Qwen con sufijo `:free` |
-| Ollama en tu PC (sin key ni internet) | `http://localhost:11434/v1/` | `qwen3:4b` |
+| Ollama en tu PC (sin key ni internet, gratis) | `http://localhost:11434/v1/` | `qwen3:4b` |
+| Ollama Cloud (key en ollama.com/settings/keys; se paga por token, no entrena con los prompts) | `https://ollama.com/v1/` | `gpt-oss:120b` (no tiene Qwen oficial) |
 
 Los nombres de modelos y las cuotas gratuitas cambian seguido: hay que confirmarlos en la página de cada proveedor. Con modelos chicos o gratuitos, más tickets pueden terminar en `invalido`, y eso es lo correcto: la validación no se relaja por el proveedor.
 
