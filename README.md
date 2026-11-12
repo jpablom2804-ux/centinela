@@ -4,7 +4,7 @@ Mesa de servicio de TI para entidades financieras, con triaje asistido por IA. P
 
 Cuando alguien reporta un ticket, un agente de IA programado desde cero lo analiza con herramientas de solo lectura: sugiere categoría, sistema afectado y prioridad, busca duplicados y artículos de la base de conocimiento, y redacta un borrador de respuesta. **El agente recomienda; el técnico decide.** Ninguna sugerencia se aplica sola.
 
-> **En construcción.** Listo: el agente de triaje en C# (fase 1, probado con Qwen) y el núcleo de `mesa-servicio` en Java (fase 2: tickets, SLA y bitácora) y un generador de tickets sintéticos. Avance en [docs/ROADMAP.md](docs/ROADMAP.md).
+> **En construcción.** Listo: el agente de triaje en C# (fase 1, probado con Qwen), el núcleo de `mesa-servicio` en Java (fase 2: tickets, SLA y bitácora) y un generador de tickets sintéticos. Avance en [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Cómo funciona
 
@@ -67,7 +67,7 @@ Este repositorio es público y no contiene ninguna contraseña ni API key en tex
 
 - En GitHub, el CI vuelve a buscar secretos en todo el historial en cada push.
 
-Cada servicio tiene sus propias instrucciones: el agente de IA en [services/agente/README.md](services/agente/README.md) el núcleo de la mesa de servicio en [services/mesa-servicio/README.md](services/mesa-servicio/README.md) y el generador de tickets sintéticos en [tools/generador/README.md](tools/generador/README.md).
+Cada servicio tiene sus propias instrucciones: el agente de IA en [services/agente/README.md](services/agente/README.md), el núcleo de la mesa de servicio en [services/mesa-servicio/README.md](services/mesa-servicio/README.md) y el generador de tickets sintéticos en [tools/generador/README.md](tools/generador/README.md).
 
 ## Documentación
 
