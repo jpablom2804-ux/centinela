@@ -38,7 +38,19 @@ Servicio `mesa-servicio`, rutas bajo `services/mesa-servicio/src/main/java/cr/ce
 | 2 | `tickets/internal/ServicioTickets.java` | `crear` | Valida el rol y crea el ticket en `nuevo` con la prioridad inicial (la ajusta un técnico, nunca el agente solo) |
 | 3 | `tickets/internal/ServicioTickets.java` | `crear` → `auditoria/RegistroAuditoria.registrar` | Registra la creación en la bitácora de solo inserción, encadenada con hash, en la misma transacción |
 | 4 | `tickets/internal/ServicioTickets.java` | `crear` | Publica `TicketCreado` en memoria |
-| 5 | `sla/internal/ServicioSla.java` | `alCrearTicket` | Arranca el reloj de resolución; el controlador responde `201` |
+| 5 | `sla/internal/ServicioSla.java` | `alCrearTicket` | Arranca el reloj de resolución |
+| 6 | `tickets/internal/ServicioTickets.java` | `crear` → `PublicadorTicketCreado.registrar` | Deja `TicketCreado` en el outbox, en la misma transacción (sigue en `TRIAJE_ASINCRONO` 1); el controlador responde `201` |
+
+## TRIAJE_ASINCRONO
+
+Empieza en `mesa-servicio` (rutas bajo `services/mesa-servicio/src/main/java/cr/centinela/mesaservicio/`) y sigue en el `agente`.
+
+| Paso | Archivo | Método | Qué hace |
+|---|---|---|---|
+| 1 | `tickets/internal/PublicadorTicketCreado.java` | `registrar` | Enmascara título, descripción y sistema reportado (`plataforma/Enmascarador`); el ticket guardado no cambia |
+| 2 | `plataforma/mensajeria/Outbox.java` | `registrar` | Arma el sobre (`id`, `tipo`, `version`, `correlationId`, `ocurridoEn`) y lo guarda sin publicar; exige estar dentro de la transacción del cambio |
+| 3 | `plataforma/mensajeria/RelevoOutbox.java` | `publicarPendientes` | Cada 2 s toma un lote con `FOR UPDATE SKIP LOCKED` (varias réplicas sin pisarse), publica en el exchange `tickets` y marca publicado solo con el ack del broker y si llegó a una cola; si no, reintenta con backoff hasta un máximo |
+| 4… | `agente` | — | Fase 3, siguiente punto: el worker consume `agente.tickets-creados` |
 
 ## CAMBIAR_ESTADO
 

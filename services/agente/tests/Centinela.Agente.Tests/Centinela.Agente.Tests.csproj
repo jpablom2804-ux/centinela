@@ -22,4 +22,9 @@
     <ProjectReference Include="..\..\src\Centinela.Agente\Centinela.Agente.csproj" />
   </ItemGroup>
 
+  <!-- Contrato de enmascarado compartido con mesa-servicio: lo prueban los dos lados. -->
+  <ItemGroup>
+    <None Include="..\..\..\..\tests\contratos\enmascarado.json" Link="contratos\enmascarado.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

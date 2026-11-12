@@ -22,6 +22,18 @@ spring:
     properties:
       hibernate:
         default_schema: mesa_servicio
+  # Solo publica (vía outbox). Confirmaciones del broker y mandatory: un evento se da por publicado solo si
+  # RabbitMQ lo aceptó y llegó a una cola.
+  rabbitmq:
+    host: ${CENTINELA_MQ_HOST:127.0.0.1}
+    port: ${CENTINELA_MQ_PUERTO:5672}
+    virtual-host: centinela
+    username: centinela
+    password: ${rabbitmq_password:}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
   jackson:
     deserialization:
       # A6: un campo que la acción no acepta (por ejemplo "prioridad" al crear) es un 400, no se ignora.
@@ -62,6 +74,13 @@ centinela:
   tickets:
     # A5: tickets que una misma persona puede crear por hora (además del rate limiting por IP de nginx).
     max-por-hora: 20
+  mensajeria:
+    relevo: PT2S
+    lote: 50
+    # Con backoff 2 s, 4 s… hasta 5 min, 50 intentos son unas 3,5 horas sin broker antes de rendirse y alertar.
+    max-intentos: 50
+    espera-confirmacion: PT5S
+    max-espera: PT5M
   usuarios-prueba:
     password: ${usuarios_prueba_password:}
     usuarios: []

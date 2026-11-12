@@ -17,6 +17,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.rabbitmq.RabbitMQContainer;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
@@ -46,7 +47,11 @@ public abstract class PruebaIntegracion {
             .withCopyToContainer(Transferable.of("clave-agente-prueba"), "/run/secrets/agente_db_password")
             .withCopyToContainer(Transferable.of("clave-powerbi-prueba"), "/run/secrets/powerbi_ro_db_password");
 
+    /** El broker real: el relevo del outbox necesita confirmaciones y mensajes devueltos de verdad. */
+    protected static final RabbitMQContainer RABBIT = new RabbitMQContainer(DockerImageName.parse("docker.io/library/rabbitmq:4-management").asCompatibleSubstituteFor("rabbitmq"));
+
     static {
+        RABBIT.start();
         POSTGRES.start();
         // Las migraciones corren aparte y con el rol dueño, como en el perfil "migracion".
         Flyway.configure()
@@ -66,6 +71,13 @@ public abstract class PruebaIntegracion {
         registro.add("centinela.usuarios-prueba.password", () -> CLAVE_USUARIOS);
         // El vigilante de SLA se llama a mano en las pruebas; la tarea programada no debe interferir.
         registro.add("centinela.sla.revision", () -> "PT24H");
+        registro.add("spring.rabbitmq.host", RABBIT::getHost);
+        registro.add("spring.rabbitmq.port", RABBIT::getAmqpPort);
+        registro.add("spring.rabbitmq.username", RABBIT::getAdminUsername);
+        registro.add("spring.rabbitmq.password", RABBIT::getAdminPassword);
+        registro.add("spring.rabbitmq.virtual-host", () -> "/");
+        // Igual que el vigilante: el relevo del outbox se llama a mano.
+        registro.add("centinela.mensajeria.relevo", () -> "PT24H");
     }
 
     /** Reloj que las pruebas pueden mover, para probar el SLA sin esperar horas. */

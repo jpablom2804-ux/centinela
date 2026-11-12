@@ -1,0 +1,23 @@
+{
+  "descripcion": "Contrato de enmascarado entre mesa-servicio (enmascara) y agente (verifica). mesa-servicio debe producir exactamente 'esperado' a partir de 'entrada'; el agente no debe detectar nada en 'esperado' y sí en 'entrada' cuando son distintos. Datos 100 % inventados.",
+  "casos": [
+    { "nombre": "cedula con guiones", "entrada": "Mi cédula es 1-2345-0678 y no puedo entrar", "esperado": "Mi cédula es [CEDULA] y no puedo entrar" },
+    { "nombre": "cedula pegada a letras", "entrada": "cedula1-0987-0654 pegada", "esperado": "cedula[CEDULA] pegada" },
+    { "nombre": "cedula con caracteres invisibles", "entrada": "cédula 1​2345​0678", "esperado": "cédula [CEDULA]" },
+    { "nombre": "telefono", "entrada": "Llamar al 8888-1234 en la tarde", "esperado": "Llamar al [TELEFONO] en la tarde" },
+    { "nombre": "telefono en ancho completo", "entrada": "Mi teléfono es ８８８８１２３４", "esperado": "Mi teléfono es [TELEFONO]" },
+    { "nombre": "telefono con raya larga", "entrada": "Teléfono 8888–1234", "esperado": "Teléfono [TELEFONO]" },
+    { "nombre": "correo", "entrada": "Escribir a ana.rojas@banco-ejemplo.cr por favor", "esperado": "Escribir a [CORREO] por favor" },
+    { "nombre": "correo con tildes", "entrada": "Contactar a josé.pérez@correo.cr", "esperado": "Contactar a [CORREO]" },
+    { "nombre": "correo ofuscado", "entrada": "Correo: ana [at] banco.cr", "esperado": "Correo: [CORREO]" },
+    { "nombre": "tarjeta", "entrada": "Tarjeta 4111 1111 1111 1111 bloqueada", "esperado": "Tarjeta [TARJETA] bloqueada" },
+    { "nombre": "cuenta IBAN", "entrada": "Cuenta CR05 0152 0200 1026 2840 66 sin fondos", "esperado": "Cuenta [CUENTA] sin fondos" },
+    { "nombre": "credencial", "entrada": "La contraseña: Banco2026! no funciona", "esperado": "La [CREDENCIAL] no funciona" },
+    { "nombre": "codigo de verificacion", "entrada": "Me llegó el código de verificación 482913 por SMS", "esperado": "Me llegó el [CODIGO] por SMS" },
+    { "nombre": "pin", "entrada": "Usuario jperez, pin 1234", "esperado": "Usuario jperez, [CODIGO]" },
+    { "nombre": "ip", "entrada": "El servidor 10.20.30.40 no responde", "esperado": "El servidor [IP] no responde" },
+    { "nombre": "monto y fecha no son datos personales", "entrada": "Pago de ₡12 500 000 del 2026-11-09 pendiente", "esperado": "Pago de ₡12 500 000 del 2026-11-09 pendiente" },
+    { "nombre": "sin datos", "entrada": "No puedo entrar a la VPN desde ayer", "esperado": "No puedo entrar a la VPN desde ayer" },
+    { "nombre": "mencionar la contraseña no es una credencial", "entrada": "Olvidé mi contraseña del correo", "esperado": "Olvidé mi contraseña del correo" }
+  ]
+}

@@ -48,7 +48,7 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 
 ## Fase 3 — Conexión con el agente
 - [x] ADR del proveedor de embeddings: Voyage AI ([ADR-007](decisiones/ADR-007-proveedor-de-embeddings.md))
-- [ ] Enmascarado en `mesa-servicio` y outbox para publicar `TicketCreado`
+- [x] Enmascarado en `mesa-servicio` y outbox para publicar `TicketCreado` (contrato de enmascarado compartido con el agente en `tests/contratos/`)
 - [ ] El agente pasa de consola a worker que consume la cola
 - [ ] API interna de solo lectura de `mesa-servicio` para las herramientas, siempre enmascarada
 - [ ] Módulo `conocimiento` con pgvector y embeddings; herramientas con búsqueda por significado

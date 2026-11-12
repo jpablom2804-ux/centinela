@@ -7,7 +7,7 @@ Núcleo de la mesa de servicio, en Java 25 y Spring Boot 4: tickets, SLA y audit
 | `tickets` | Crear, listar, ver, asignar, cambiar estado y prioridad, comentar. Transiciones válidas; un ticket cerrado solo se reabre con justificación |
 | `sla` | Reloj de resolución por ticket en tiempo hábil (jornada, fines de semana y feriados en hora de Costa Rica). Se pausa en `en_espera`. Avisos en memoria al 75 % y al vencer, con ShedLock para varias réplicas |
 | `auditoria` | Bitácora de solo inserción, encadenada con hash: un registro alterado o insertado a mano se detecta |
-| `plataforma` | Seguridad, usuario actual y errores `{ codigo, mensaje }` |
+| `plataforma` | Seguridad, usuario actual, errores `{ codigo, mensaje }`, ID de correlación, enmascarado de datos sensibles y outbox hacia RabbitMQ |
 
 ## Seguridad que ya está en el código
 
@@ -16,6 +16,8 @@ Núcleo de la mesa de servicio, en Java 25 y Spring Boot 4: tickets, SLA y audit
 - **Un DTO por acción:** un campo de más (por ejemplo `prioridad` al crear) es un `400` (A6). Hay largos máximos en todo el texto (A4).
 - **Límite por persona (A5):** 20 tickets por hora, contados en la base para que valga con varias réplicas; el siguiente recibe `429`.
 - **Toda acción va a la bitácora en la misma transacción,** incluidas las pausas del SLA.
+- **Nada sale sin enmascarar:** `TicketCreado` lleva cédulas, cuentas, tarjetas, correos, teléfonos, credenciales, códigos e IPs reemplazados por marcadores (`[CEDULA]`…). Las reglas son las mismas que verifica el agente, y las dos partes prueban el mismo archivo de casos ([tests/contratos/enmascarado.json](../../tests/contratos/enmascarado.json)).
+- **Outbox transaccional:** el evento se guarda con el ticket y se publica después, con confirmación de RabbitMQ. Si el broker está caído, el ticket se crea igual y el evento sale cuando vuelve.
 
 ## Cómo correrlo
 
@@ -57,7 +59,7 @@ curl -u "solicitante1:$P" -H "Content-Type: application/json" \
 ./mvnw -B verify
 ```
 
-Son 36 pruebas, entre ellas:
-- **Unitarias:** transiciones y calendario laboral (fines de semana, feriados y cambio de día en UTC).
+Son 64 pruebas, entre ellas:
+- **Unitarias:** transiciones, calendario laboral (fines de semana, feriados y cambio de día en UTC) y enmascarado (el contrato compartido con el agente más evasiones como ancho completo, caracteres invisibles o dígitos de otros alfabetos).
 - **Límites entre módulos:** la verificación de Spring Modulith.
-- **Integración con PostgreSQL real (Testcontainers):** usa el mismo script de init del proyecto, Flyway corre con el rol dueño y la app con el suyo. Cubren la API, la bitácora y el vigilante de SLA, este último con un reloj que se puede mover.
+- **Integración con PostgreSQL y RabbitMQ reales (Testcontainers):** usa el mismo script de init del proyecto, Flyway corre con el rol dueño y la app con el suyo. Cubren la API, la bitácora, el vigilante de SLA (con un reloj que se puede mover) y el outbox: mensaje enmascarado, `correlationId` de punta a punta y reintento cuando no hay cola.

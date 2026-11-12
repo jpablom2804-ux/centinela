@@ -15,6 +15,10 @@ Todos los eventos de RabbitMQ comparten este sobre:
 
 Reglas: fechas ISO-8601 en UTC; montos, si aparecen, como texto decimal más moneda; un cambio incompatible sube `version` y el consumidor acepta ambas durante la transición.
 
+- `correlationId` es texto: el `X-Request-ID` de la petición original (lo pone nginx: 32 hexadecimales) o un UUID si no venía o no era válido (`[A-Za-z0-9-]{8,64}`).
+- El mensaje de AMQP repite `id` en `message_id`, `tipo` en `type` y el `correlationId` en `correlation_id`, con `content_type: application/json` y entrega persistente.
+- `mesa-servicio` publica con outbox: un evento puede llegar **más de una vez** (por ejemplo, si una réplica cae entre el ack del broker y el commit). Por eso los consumidores deduplican por `id`.
+
 ## TicketCreado (v1)
 
 Publica `mesa-servicio` (vía outbox) → consume `agente`.
@@ -87,6 +91,6 @@ Todo vive en el vhost `centinela` de RabbitMQ.
 
 | Exchange / cola | Uso |
 |---|---|
-| `tickets` → `agente.tickets-creados` | Trabajo para el agente |
+| `tickets` → `agente.tickets-creados` | Trabajo para el agente. Exchange `direct`, clave `ticket.creado`. El exchange lo declara `mesa-servicio`; la cola y su DLQ, el `agente`. Si no hay cola enlazada, el broker devuelve el mensaje y el outbox lo reintenta: nunca se pierde en silencio |
 | `triajes` → `mesa-servicio.tickets-triados` | Resultados del agente |
 | `*.dlq` | Mensajes muertos de cada cola |

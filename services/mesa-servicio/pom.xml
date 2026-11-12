@@ -69,6 +69,12 @@
 			<version>6.6.0</version>
 		</dependency>
 
+		<!-- Publicar eventos para otros servicios (vía outbox); RabbitMQ es el broker del proyecto (ADR-003) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+
 		<!-- Solo el núcleo de Modulith: un test verifica que ningún módulo use el internal/ de otro -->
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>
@@ -113,6 +119,11 @@
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-rabbitmq</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

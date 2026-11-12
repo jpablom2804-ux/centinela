@@ -109,6 +109,12 @@ Origen: A1–A13 salieron de la revisión propia. A14–A28 los encontró un rev
 
 **Estado de la fase 2 (2026-11-12):** en `mesa-servicio` quedan cubiertos A4 (largos máximos validados en la API), A5 (20 tickets por hora por usuario, contados en la base), A6 (un DTO por acción; un campo de más es `400`), A14 (las migraciones corren aparte con el perfil `migracion` y el rol dueño; la app nunca recibe ese secreto) y la parte de A8 que corresponde a la fase 2 (bitácora encadenada con hash y su verificación; la app recibe `permission denied` en `UPDATE`, `DELETE` y `TRUNCATE`). De A8 falta la verificación periódica, la copia externa (fases 6 y 8) y registrar los `403` y `404` repetidos.
 
+**Estado de la fase 3 (en curso, 2026-11-12):** A1 queda cubierto también en `mesa-servicio`:
+- `Enmascarador` usa la misma normalización y las mismas reglas que el verificador del agente, y reemplaza cada dato por su marcador (`[CEDULA]`, `[CORREO]`…).
+- Si después de tres pasadas todavía detecta algo, retiene el texto completo (`[TEXTO_RETENIDO]`) en vez de arriesgarse.
+- El corpus compartido es `tests/contratos/enmascarado.json`. `mesa-servicio` prueba que produce exactamente el texto esperado, y el agente prueba que ese texto pasa su verificación y que la entrada original no la pasa.
+- El ticket guardado no cambia: solo sale enmascarado lo que va a otro servicio. El `X-Request-ID` del cliente se valida antes de usarlo como `correlationId`, porque termina en logs y mensajes.
+
 ## Suite adversaria (`tests/adversarial/`)
 
 Cada caso es un archivo con la entrada, el ataque y el resultado esperado. Los 5 primeros son de la fase 1.

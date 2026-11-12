@@ -33,15 +33,17 @@ class ServicioTickets {
     private final ApplicationEventPublisher eventos;
     private final Clock reloj;
     private final LimitesTickets limites;
+    private final PublicadorTicketCreado publicador;
 
     ServicioTickets(TicketRepositorio tickets, ComentarioRepositorio comentarios, RegistroAuditoria auditoria,
-            ApplicationEventPublisher eventos, Clock reloj, LimitesTickets limites) {
+            ApplicationEventPublisher eventos, Clock reloj, LimitesTickets limites, PublicadorTicketCreado publicador) {
         this.tickets = tickets;
         this.comentarios = comentarios;
         this.auditoria = auditoria;
         this.eventos = eventos;
         this.reloj = reloj;
         this.limites = limites;
+        this.publicador = publicador;
     }
 
     // [FLUJO CREAR_TICKET 2] Valida el rol y el límite por usuario (A5), crea el ticket en estado nuevo → paso 3 (bitácora) y 4 (evento)
@@ -58,6 +60,8 @@ class ServicioTickets {
         auditar(usuario, "TICKET_CREADO", ticket, null);
         // [FLUJO CREAR_TICKET 4] Publica TicketCreado en memoria → ServicioSla.alCrearTicket (paso 5) arranca el reloj
         eventos.publishEvent(new EventosTicket.TicketCreado(ticket.id(), ticket.prioridad(), ahora, usuario.id()));
+        // [FLUJO CREAR_TICKET 6] Deja TicketCreado enmascarado en el outbox, en esta misma transacción → TRIAJE_ASINCRONO 1
+        publicador.registrar(ticket);
         return Dtos.TicketVista.de(ticket);
     }
 
