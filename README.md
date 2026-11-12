@@ -31,16 +31,25 @@ flowchart LR
 
 ## Entorno de desarrollo
 
-Requisitos: Docker con Compose.
+Requisitos: Docker con Compose, OpenSSL (viene con Git Bash) y, para guardar los secretos cifrados, [SOPS](https://github.com/getsops/sops) y [age](https://github.com/FiloSottile/age).
 
 ```bash
-cp .env.example .env      # completar las contraseñas
-docker compose up -d      # PostgreSQL (con pgvector) y RabbitMQ
-docker compose ps         # ambos deben quedar "healthy"
+cp .env.example .env                 # solo configuración, sin contraseñas
+./scripts/secretos.sh generar        # crea las contraseñas en secrets/ (fuera de git)
+docker compose up -d                 # PostgreSQL (con pgvector) y RabbitMQ
+docker compose ps                    # ambos deben quedar "healthy"
+```
+
+Los secretos llegan a cada contenedor como archivos en `/run/secrets/`, nunca como variables de entorno ([ADR-005](docs/decisiones/ADR-005-gestion-de-secretos.md)). Para llevarlos a otra máquina:
+
+```bash
+./scripts/secretos.sh llave          # crea tu llave de age y la registra en .sops.yaml
+./scripts/secretos.sh cifrar         # secrets/ → secrets.enc.env (este sí se versiona)
+./scripts/secretos.sh descifrar      # en la otra máquina, con su llave registrada
 ```
 
 - PostgreSQL en `127.0.0.1:5432`, con roles y esquemas por servicio ([docs/ARQUITECTURA.md](docs/ARQUITECTURA.md#base-de-datos)).
-- Panel de RabbitMQ en http://127.0.0.1:15672.
+- Panel de RabbitMQ en http://127.0.0.1:15672 (usuario `centinela`, contraseña en `secrets/rabbitmq_password`).
 
 Los roles y esquemas se crean solo la primera vez, cuando el volumen está vacío. Para recrearlos: `docker compose down -v` (borra los datos).
 

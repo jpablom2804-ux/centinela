@@ -1,6 +1,9 @@
 .env
 *.env.local
 
+# Secretos en texto plano (ADR-005). secrets.enc.env, que va cifrado, sí se versiona.
+secrets/
+
 # Java
 target/
 *.class

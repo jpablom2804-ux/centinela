@@ -64,6 +64,7 @@ Aprendidas en el proyecto anterior en Rocky Linux (scoopy) y en `docs/ARQUITECTU
 
 - **Compatible con Podman:** imágenes con nombre completo (`docker.io/...`) y montajes con etiqueta SELinux `:z`/`:Z`. SELinux nunca se desactiva.
 - **Todo servicio debe aguantar varias réplicas:** sin estado en memoria entre peticiones, sin sesiones pegajosas, tareas programadas con bloqueo en la base (ShedLock), outbox con `SKIP LOCKED`.
+- **Secretos como archivos, uno por servicio (ADR-005):** cada contenedor recibe solo sus secretos en `/run/secrets/` (Spring: `configtree:`; .NET: `AddKeyPerFile`). Nunca en variables de entorno, en la imagen, en logs ni en mensajes de error. `.env` solo lleva configuración no secreta. En desarrollo se generan con `./scripts/secretos.sh` y se guardan cifrados con SOPS + age en `secrets.enc.env`.
 - **nginx es la única puerta:** TLS, rate limiting, headers de seguridad, `X-Request-ID` y `/actuator/` bloqueado. Ningún servicio publica puertos hacia afuera; en desarrollo solo en `127.0.0.1`.
 
 ## Principios y anti‑sobreingeniería
@@ -101,7 +102,7 @@ Se aplican tal cual las del skill: SOLID, DRY, KISS, YAGNI, composición sobre h
 - **Tope diario de tokens** en `agente` (desde la fase 3): al alcanzarlo, los tickets pasan a triaje manual sin llamar al modelo. La alerta de **costo** diario (en dinero) la calcula `reportes`, que es quien conoce los precios.
 - **Medir siempre:** tokens de entrada y salida, modelo, duración e iteraciones de cada ticket (ver `docs/KPIS.md`).
 - **Modelo, umbrales y precios por configuración**, nunca en el código.
-- **La API key solo vive en variables de entorno o Secrets.** No se registran en logs los prompts completos, los textos de tickets ni las respuestas crudas; solo IDs y métricas.
+- **La API key solo vive como secreto** (`dotnet user-secrets` en desarrollo, archivo montado en contenedor; ADR-005), nunca en variables de entorno, en `.env` ni en el código. No se registran en logs los prompts completos, los textos de tickets ni las respuestas crudas; solo IDs y métricas.
 - **Todo cambio de prompt, herramienta o modelo obliga a correr la suite adversaria** (`tests/adversarial/`) antes de darlo por terminado.
 
 ## Reglas de mensajería
@@ -151,4 +152,5 @@ Todo lo prohibido en el skill, más:
 - Compartir tablas o clases entre servicios.
 - Usar datos reales de personas.
 - Escribir la API key, el modelo, los umbrales o los precios en el código.
+- Pasar secretos como variables de entorno, guardarlos en `.env` o versionarlos sin cifrar.
 - Agregar un servicio nuevo sin un ADR aprobado.

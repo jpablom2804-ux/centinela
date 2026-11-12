@@ -61,7 +61,9 @@ Verificar siempre la numeración y el texto oficiales en owasp.org y genai.owasp
 | Puertos expuestos de más | firewalld: solo SSH, 80 y 443. PostgreSQL, RabbitMQ, Keycloak admin y los servicios solo en la red interna o en `127.0.0.1` |
 | SSH | Solo con llave, sin login de root, usuario de despliegue dedicado |
 | SELinux desactivado "para que funcione" | Siempre en enforcing; montajes con etiqueta `:z`/`:Z` y `setsebool -P httpd_can_network_connect 1` para el proxy |
-| Secretos en el servidor | `.env` con permisos `600`, del usuario de despliegue. Nunca en la imagen |
+| Secretos filtrados por variables de entorno (`docker inspect`, `/proc/<pid>/environ`, volcados) | Secretos como archivos de solo lectura en `/run/secrets/`, cada servicio solo con los suyos (ADR-005). En el servidor, `podman secret` o `systemd-creds`; en Kubernetes, Secrets con cifrado en reposo. Nunca en la imagen |
+| Conexiones locales sin contraseña dentro del contenedor de PostgreSQL | La imagen oficial confía (`trust`) en `127.0.0.1` y en el socket local: quien pueda hacer `exec` en el contenedor es superusuario. Por eso nadie más que el administrador tiene acceso a `exec` en el servidor, y las pruebas de contraseñas se hacen siempre por la red, nunca desde dentro del contenedor |
+| Secretos en el repositorio o copiados en texto plano entre máquinas | `secrets/` fuera de git; solo se versiona `secrets.enc.env`, cifrado con SOPS + age; la llave de age vive solo en cada máquina |
 | Pérdida de datos | `pg_dump` programado, copiado fuera del servidor, y una restauración de prueba documentada |
 
 ## Suite adversaria (`tests/adversarial/`)
@@ -88,6 +90,7 @@ Casos de login y sesión (fase 6, contra Keycloak y `mesa-servicio`):
 15. `POST` a `/api` sin token CSRF → `403`.
 16. La cookie de sesión tiene `HttpOnly`, `Secure`, `SameSite=Lax` y el prefijo `__Host-`; no hay ningún token en `localStorage`, `sessionStorage` ni en cookies legibles por JavaScript.
 17. El ID de sesión cambia después del login; tras cerrar sesión, la cookie anterior ya no sirve.
+18. Ninguna contraseña ni API key aparece en `docker inspect`, en `/proc/1/environ` de los contenedores, en los logs ni en las respuestas de error.
 
 Los casos con el cliente LLM falso corren siempre y no gastan tokens. Los que necesitan el modelo real se corren a mano cuando cambia un prompt, una herramienta o el modelo, y se registran sus tokens.
 

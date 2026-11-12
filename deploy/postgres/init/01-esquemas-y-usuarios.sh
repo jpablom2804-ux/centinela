@@ -1,23 +1,24 @@
 #!/bin/bash
 # Crea los roles y esquemas de cada servicio, la extensión pgvector y el usuario de Power BI.
 # Lo ejecuta la imagen de PostgreSQL una sola vez: cuando el volumen de datos está vacío.
-# Las contraseñas llegan por variables de entorno y se pasan a psql como variables (:'...'),
-# nunca concatenadas en el SQL.
+# Las contraseñas llegan como archivos en /run/secrets (ADR-005), no como variables de entorno.
+# psql las lee con \set y comillas invertidas: nunca pasan por la línea de comandos ni se
+# concatenan en el SQL.
 set -eo pipefail
 
-: "${MESA_SERVICIO_DB_PASSWORD:?falta MESA_SERVICIO_DB_PASSWORD}"
-: "${MESA_SERVICIO_APP_DB_PASSWORD:?falta MESA_SERVICIO_APP_DB_PASSWORD}"
-: "${AGENTE_DB_PASSWORD:?falta AGENTE_DB_PASSWORD}"
-: "${POWERBI_RO_DB_PASSWORD:?falta POWERBI_RO_DB_PASSWORD}"
+for secreto in mesa_servicio_db_password mesa_servicio_app_db_password agente_db_password powerbi_ro_db_password; do
+  [ -s "/run/secrets/$secreto" ] || { echo "Falta el secreto $secreto en /run/secrets" >&2; exit 1; }
+done
 
 psql -v ON_ERROR_STOP=1 \
   --username "$POSTGRES_USER" \
   --dbname "$POSTGRES_DB" \
-  -v db="$POSTGRES_DB" \
-  -v pass_mesa="$MESA_SERVICIO_DB_PASSWORD" \
-  -v pass_mesa_app="$MESA_SERVICIO_APP_DB_PASSWORD" \
-  -v pass_agente="$AGENTE_DB_PASSWORD" \
-  -v pass_powerbi="$POWERBI_RO_DB_PASSWORD" <<'SQL'
+  -v db="$POSTGRES_DB" <<'SQL'
+\set pass_mesa `cat /run/secrets/mesa_servicio_db_password`
+\set pass_mesa_app `cat /run/secrets/mesa_servicio_app_db_password`
+\set pass_agente `cat /run/secrets/agente_db_password`
+\set pass_powerbi `cat /run/secrets/powerbi_ro_db_password`
+
 -- Nadie se conecta ni crea objetos salvo lo que se otorga explícitamente abajo.
 REVOKE ALL ON DATABASE :"db" FROM PUBLIC;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;

@@ -7,12 +7,13 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [x] `git init`, `.gitignore`, `.env.example`, primer commit
 - [x] `compose.yml` con PostgreSQL + pgvector (roles y esquemas por servicio, más `powerbi_ro`) y RabbitMQ (con panel de administración)
 - [x] `/graphify .`
+- [x] Secretos como archivos montados por servicio, sin variables de entorno, y cifrados con SOPS + age (ADR-005)
 
 **Hecho cuando:** `docker compose up` levanta Postgres y RabbitMQ sanos, y no hay secretos versionados.
 
 ## Fase 1 — El agente desde cero (C#, consola)  ← se manda al profesor
 - [ ] Proyecto .NET con la estructura de `docs/ARQUITECTURA.md`
-- [ ] Cliente HTTP a la API del modelo, hecho a mano con `HttpClient` (modelo y API key por configuración)
+- [ ] Cliente HTTP a la API del modelo, hecho a mano con `HttpClient`. Modelo por configuración; API key con `dotnet user-secrets` en desarrollo y desde archivo (`AddKeyPerFile`) en contenedor, nunca en variables de entorno
 - [ ] Ciclo del agente: mensaje → el modelo pide una herramienta → se ejecuta → se devuelve el resultado → repetir hasta respuesta final
 - [ ] 3 herramientas de solo lectura sobre datos en memoria: `buscar_tickets_similares`, `buscar_articulos_conocimiento`, `consultar_estado_servicio`. Búsqueda simple por palabras clave (los embeddings llegan en la fase 3). Sin `ticketId` elegido por el modelo
 - [ ] Verificación de enmascarado antes de cada llamada al modelo
@@ -91,7 +92,8 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [ ] Rate limiting en nginx sobre el login de Keycloak y `/api` (`429`)
 - [ ] `mesa-servicio` con 2 réplicas detrás de `upstream` (sin sesiones pegajosas), ShedLock en el reloj de SLA, outbox con `SKIP LOCKED`; probar que tumbar una réplica no corta sesiones
 - [ ] SELinux en enforcing (montajes `:z`/`:Z`, `httpd_can_network_connect`); firewalld solo SSH, 80 y 443
-- [ ] SSH solo con llave, sin root; usuario de despliegue dedicado; `.env` con permisos `600`
+- [ ] SSH solo con llave, sin root; usuario de despliegue dedicado
+- [ ] Secretos con `podman secret` o `systemd-creds` (cifrados y atados a la máquina); ningún `.env` con secretos en el servidor; procedimiento de rotación documentado
 - [ ] Servicios como unidades de systemd (Podman Quadlet)
 - [ ] Respaldos con `pg_dump` programado, copia fuera del servidor y restauración de prueba
 - [ ] `docs/DESPLIEGUE.md`
@@ -102,6 +104,8 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [ ] Contenedores con UID arbitrario (compatibles con OpenShift)
 - [ ] Escalar el agente a 2 réplicas y comprobar que no se duplican triajes
 - [ ] `mesa-servicio` con 2 réplicas detrás del Ingress (rate limiting en el Ingress), migraciones como Job
+- [ ] Secrets de Kubernetes con cifrado en reposo, generados desde SOPS
+- [ ] Opcional, con su propio ADR: OpenBao con credenciales dinámicas de PostgreSQL
 
 ## Si sobra tiempo
 - [ ] Backlog y sprints para problemas, cambios y mejoras, con velocidad del equipo (fuera del alcance por ADR-003)

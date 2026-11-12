@@ -1,6 +1,8 @@
 # Entorno de desarrollo, fase 0: solo infraestructura. Cada servicio se agrega en su fase.
 # Los puertos se publican solo en 127.0.0.1: nada queda expuesto a la red local.
 # Compatible con Podman (Rocky Linux): imágenes con nombre completo y montajes con etiqueta SELinux.
+# Secretos (ADR-005): llegan como archivos en /run/secrets, nunca como variables de entorno.
+# Antes del primer `up`: ./scripts/secretos.sh generar   (o `descifrar` si ya existen cifrados)
 name: centinela
 
 services:
@@ -10,11 +12,14 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?falta POSTGRES_DB en .env}
       POSTGRES_USER: ${POSTGRES_USER:?falta POSTGRES_USER en .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
-      MESA_SERVICIO_DB_PASSWORD: ${MESA_SERVICIO_DB_PASSWORD:?falta MESA_SERVICIO_DB_PASSWORD en .env}
-      MESA_SERVICIO_APP_DB_PASSWORD: ${MESA_SERVICIO_APP_DB_PASSWORD:?falta MESA_SERVICIO_APP_DB_PASSWORD en .env}
-      AGENTE_DB_PASSWORD: ${AGENTE_DB_PASSWORD:?falta AGENTE_DB_PASSWORD en .env}
-      POWERBI_RO_DB_PASSWORD: ${POWERBI_RO_DB_PASSWORD:?falta POWERBI_RO_DB_PASSWORD en .env}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+    # Solo los secretos que necesita el script de init; ningún otro servicio recibe estos.
+    secrets:
+      - postgres_admin_password
+      - mesa_servicio_db_password
+      - mesa_servicio_app_db_password
+      - agente_db_password
+      - powerbi_ro_db_password
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -35,10 +40,10 @@ services:
     image: docker.io/library/rabbitmq:4-management
     # Nombre de nodo fijo: sin esto, recrear el contenedor cambia el nodo y se pierden las colas del volumen.
     hostname: rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?falta RABBITMQ_DEFAULT_USER en .env}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?falta RABBITMQ_DEFAULT_PASS en .env}
-      RABBITMQ_DEFAULT_VHOST: centinela
+    # Usuario, contraseña y vhost por defecto, en un archivo de configuración montado como secreto.
+    secrets:
+      - source: rabbitmq_conf
+        target: /etc/rabbitmq/conf.d/20-centinela.conf
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
@@ -51,6 +56,20 @@ services:
       retries: 12
       start_period: 30s
     restart: unless-stopped
+
+secrets:
+  postgres_admin_password:
+    file: ./secrets/postgres_admin_password
+  mesa_servicio_db_password:
+    file: ./secrets/mesa_servicio_db_password
+  mesa_servicio_app_db_password:
+    file: ./secrets/mesa_servicio_app_db_password
+  agente_db_password:
+    file: ./secrets/agente_db_password
+  powerbi_ro_db_password:
+    file: ./secrets/powerbi_ro_db_password
+  rabbitmq_conf:
+    file: ./secrets/rabbitmq.conf
 
 volumes:
   postgres-datos:
