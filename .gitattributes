@@ -1,4 +1,5 @@
-* text=auto
+# LF en todas las plataformas: coincide con .editorconfig y con Rocky Linux.
+* text=auto eol=lf
 *.sh text eol=lf
 # Archivo cifrado con SOPS: git no debe tocar sus finales de línea.
 secrets.enc.env -text
