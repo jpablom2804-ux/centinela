@@ -49,3 +49,20 @@ jobs:
         run: |
           dotnet list package --vulnerable --include-transitive | tee vulnerables.txt
           ! grep -q "has the following vulnerable packages" vulnerables.txt
+
+  mesa-servicio:
+    name: mesa-servicio (Java)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mesa-servicio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      # Incluye las pruebas con PostgreSQL real (Testcontainers): el runner trae Docker.
+      - name: Pruebas
+        run: ./mvnw -B verify

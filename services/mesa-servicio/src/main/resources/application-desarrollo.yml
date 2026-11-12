@@ -1,0 +1,14 @@
+# Usuarios de prueba (fase 2, antes de Keycloak). Todos usan la contraseña del secreto usuarios_prueba_password.
+centinela:
+  usuarios-prueba:
+    usuarios:
+      - { nombre: solicitante1, roles: [SOLICITANTE] }
+      - { nombre: solicitante2, roles: [SOLICITANTE] }
+      - { nombre: tecnico1, roles: [TECNICO] }
+      - { nombre: tecnico2, roles: [TECNICO] }
+      - { nombre: coordinador1, roles: [COORDINADOR] }
+      - { nombre: auditor1, roles: [AUDITOR] }
+
+# En desarrollo solo escucha en esta máquina.
+server:
+  address: 127.0.0.1

@@ -18,6 +18,7 @@ NOMBRES=(
   agente_db_password
   powerbi_ro_db_password
   rabbitmq_password
+  usuarios_prueba_password
 )
 RABBITMQ_USUARIO=${RABBITMQ_USUARIO:-centinela}
 

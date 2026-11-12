@@ -25,21 +25,22 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [x] Primeros 5 casos adversarios (`docs/SEGURIDAD.md`) pasando con el modelo falso
 - [x] Proveedor configurable: Anthropic o compatible con OpenAI, para usar Qwen gratis en desarrollo (ADR-006)
 - [x] Hallazgos del modelado de amenazas en el código del agente (`docs/SEGURIDAD.md`), cada uno con su caso: A1 (enmascarado normalizado y categorías nuevas), A15 (URLs y caracteres invisibles en la salida), A16 (tope de herramientas y presupuesto antes de enviar), A17 (falso positivo que aborta), A18 (errores por `type`/`code`), A26, A27 y A28
-- [ ] Casos 1 y 2 de la suite adversaria contra el modelo real (necesita API key)
-- [ ] Primera corrida real: `dotnet run -- ejemplos/ticket.json` con Qwen (necesita API key o Ollama)
+- [x] Casos 1 y 2 de la suite adversaria contra el modelo real (Qwen en Groq: 9 de 9 seguros; ver `services/agente/README.md`)
+- [x] Primera corrida real: `dotnet run -- ejemplos/ticket.json` con Qwen en Groq
 - [x] README de la fase con un ejemplo de entrada y salida, y qué se aprendió
 
 **Hecho cuando:** `dotnet run -- ticket.json` devuelve un triaje válido, los tests pasan y la suite adversaria básica está en verde.
 
 ## Fase 2 — Núcleo de la mesa de servicio (Java)
-- [ ] Usar la LTS vigente de Java y de Spring Boot (verificar al empezar, como dice ADR-002)
-- [ ] `mesa-servicio` como monolito modular, Flyway con el rol `mesa_servicio` y la app con `mesa_servicio_app`
-- [ ] Módulo `tickets`: tipos, estados y transiciones válidas; un ticket cerrado solo se reabre con justificación
-- [ ] Módulo `sla`: políticas P1–P4, calendario laboral, pausas, eventos en memoria al 75 % y al vencer
-- [ ] Módulo `auditoria`: bitácora de solo inserción, con un test que pruebe que la app no puede hacer `UPDATE` ni `DELETE`
-- [ ] Roles y control de acceso por recurso (todavía sin Keycloak: usuarios de prueba)
-- [ ] Tests de transiciones de estado y de relojes de SLA con casos límite (pausas, fines de semana, cambio de día en UTC)
+- [x] Usar la LTS vigente de Java y de Spring Boot (Java 25 y Spring Boot 4.1.2, verificados el 2026-11-12)
+- [x] `mesa-servicio` como monolito modular (límites verificados con Spring Modulith), Flyway con el rol `mesa_servicio` en un proceso aparte (perfil `migracion`, A14) y la app con `mesa_servicio_app`
+- [x] Módulo `tickets`: tipos, estados y transiciones válidas; un ticket cerrado solo se reabre con justificación; un DTO por acción (A6) y largos máximos (A4)
+- [x] Módulo `sla`: políticas P1–P4, calendario laboral, pausas, eventos en memoria al 75 % y al vencer, con ShedLock
+- [x] Módulo `auditoria`: bitácora de solo inserción y encadenada con hash (A8), con un test que prueba que la app no puede hacer `UPDATE`, `DELETE` ni `TRUNCATE`
+- [x] Roles y control de acceso por recurso (todavía sin Keycloak: usuarios de prueba); ticket ajeno e inexistente con el mismo `404`
+- [x] Tests de transiciones de estado y de relojes de SLA con casos límite (pausas, fines de semana, feriados, cambio de día en UTC)
 - [ ] `generador`: crea tickets sintéticos por la API
+- [ ] Límite de tickets por usuario en `mesa-servicio` (A5)
 
 **Hecho cuando:** se crean tickets por la API, los relojes de SLA corren y cada acción aparece en la bitácora.
 

@@ -1,0 +1,64 @@
+# mesa-servicio corre con el rol mesa_servicio_app (sin permisos de dueño ni de UPDATE/DELETE en auditoria).
+# Los secretos llegan como archivos (ADR-005): /run/secrets en contenedor, o la carpeta de CENTINELA_SECRETOS.
+spring:
+  application:
+    name: mesa-servicio
+  config:
+    import: optional:configtree:${CENTINELA_SECRETOS:/run/secrets}/
+  datasource:
+    url: jdbc:postgresql://${CENTINELA_BD_HOST:127.0.0.1}:${CENTINELA_BD_PUERTO:5432}/${CENTINELA_BD_NOMBRE:centinela}
+    username: mesa_servicio_app
+    password: ${mesa_servicio_app_db_password}
+  # A14: la app nunca migra. Las migraciones corren aparte, con el perfil "migracion" y el rol dueño.
+  flyway:
+    enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+      naming:
+        # asignadoA → asignado_a. Explícito: no depender del valor por defecto de cada versión.
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    properties:
+      hibernate:
+        default_schema: mesa_servicio
+  jackson:
+    deserialization:
+      # A6: un campo que la acción no acepta (por ejemplo "prioridad" al crear) es un 400, no se ignora.
+      fail-on-unknown-properties: true
+
+server:
+  error:
+    include-stacktrace: never
+    include-message: never
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+centinela:
+  sla:
+    # Tiempo hábil de resolución por prioridad.
+    resolucion:
+      P1: PT4H
+      P2: PT8H
+      P3: PT24H
+      P4: PT72H
+    umbral-alerta: 0.75
+    revision: PT1M
+    jornada:
+      zona: America/Costa_Rica
+      inicio: "08:00"
+      fin: "17:00"
+      dias: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY]
+      feriados: []
+  usuarios-prueba:
+    password: ${usuarios_prueba_password:}
+    usuarios: []

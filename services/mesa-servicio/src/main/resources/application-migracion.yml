@@ -1,0 +1,12 @@
+# A14: las migraciones corren en un proceso aparte, con el rol dueño de los esquemas, y terminan.
+# La app normal nunca carga esta configuración ni recibe el secreto mesa_servicio_db_password.
+spring:
+  main:
+    web-application-type: none
+  flyway:
+    enabled: true
+    user: mesa_servicio
+    password: ${mesa_servicio_db_password}
+    default-schema: mesa_servicio
+    schemas: mesa_servicio,auditoria,reportes
+    create-schemas: false
