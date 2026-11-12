@@ -1,0 +1,41 @@
+# En cada push y pull request: busca secretos en todo el historial y verifica el agente.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  secretos:
+    name: Sin secretos en el historial
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  agente:
+    name: Agente (.NET)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/agente
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: services/agente/global.json
+      - name: Formato
+        run: dotnet format --verify-no-changes
+      - name: Pruebas (sin modelo real, sin gastar tokens)
+        run: dotnet test
+      - name: Paquetes vulnerables
+        run: |
+          dotnet list package --vulnerable --include-transitive | tee vulnerables.txt
+          ! grep -q "has the following vulnerable packages" vulnerables.txt

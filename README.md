@@ -53,6 +53,22 @@ Los secretos llegan a cada contenedor como archivos en `/run/secrets/`, nunca co
 
 Los roles y esquemas se crean solo la primera vez, cuando el volumen está vacío. Para recrearlos: `docker compose down -v` (borra los datos).
 
+### Secretos fuera del repo
+
+Este repositorio es público y no contiene ninguna contraseña ni API key en texto plano:
+
+- Las contraseñas de desarrollo viven en `secrets/` (ignorada por git). En el repo solo está `secrets.enc.env`, cifrado con age.
+- La API key del modelo vive en `dotnet user-secrets`, fuera de la carpeta del proyecto.
+- Un hook de pre-commit con [gitleaks](https://github.com/gitleaks/gitleaks) bloquea cualquier commit que traiga un secreto. Se activa una vez por clon:
+
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+- En GitHub, el CI vuelve a buscar secretos en todo el historial en cada push.
+
+El agente de IA tiene sus propias instrucciones de uso en [services/agente/README.md](services/agente/README.md).
+
 ## Documentación
 
 | Documento | Contenido |
@@ -62,3 +78,8 @@ Los roles y esquemas se crean solo la primera vez, cuando el volumen está vací
 | [SEGURIDAD](docs/SEGURIDAD.md) | Riesgos, controles y suite adversaria |
 | [KPIS](docs/KPIS.md) | Indicadores de servicio, calidad del triaje y costo |
 | [CONTEXTO](docs/CONTEXTO.md) | De dónde salió el proyecto y por qué |
+| [Decisiones](docs/decisiones/) | ADRs: arquitectura, lenguajes, dominio, login, secretos y proveedor del modelo |
+
+## Licencia
+
+[MIT](LICENSE).
