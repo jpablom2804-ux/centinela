@@ -6,7 +6,7 @@ La base es el skill `buenas-practicas-java-react`. En Claude Code se usa la vers
 
 ## Antes de cualquier tarea
 
-1. **Graphify primero.** Si existe `graphify-out/`, leer `graphify-out/GRAPH_REPORT.md` y navegar con el grafo. Nunca explorar todo el repo con lecturas de carpetas o grep masivo. Si el grafo no existe o está desactualizado, avisar y correr `/graphify .`. Después de cambios, `/graphify . --update`. `graphify-out/` no se versiona: es local y se regenera.
+1. **Graphify primero.** Si existe `graphify-out/`, leer `graphify-out/GRAPH_REPORT.md` y navegar con el grafo. Nunca explorar todo el repo con lecturas de carpetas o grep masivo. Si el grafo no existe, avisar y correr `/graphify .`. **El grafo se actualiza una vez al cerrar cada fase** (o antes, si cambia la arquitectura o un ADR), con `/graphify . --update`, no después de cada cambio: el código se extrae gratis, pero cada pasada sobre documentos cuesta unos 100.000 tokens. Entre actualizaciones, el grafo da la estructura y lo reciente se ve con `git log`/`git diff` desde la última actualización, abriendo solo los archivos que cambiaron. `graphify-out/` no se versiona: es local y se regenera.
 2. **Revisar decisiones pendientes.** Si algún ADR en `docs/decisiones/` está en estado **Propuesto**, presentárselo al usuario y esperar su aprobación antes de crear carpetas o código de servicios. Al aprobarse, cambiar el estado a **Aceptado** y actualizar el perfil.
 3. **Ubicar la tarea en `docs/ROADMAP.md`.** No adelantar fases sin que el usuario lo pida. Marcar los ítems al terminarlos.
 4. En la primera sesión, leer `docs/CONTEXTO.md` (de dónde salió el proyecto y por qué se tomaron las decisiones).
@@ -139,7 +139,7 @@ Además de la lista del skill:
 - [ ] Mensajes nuevos o cambiados documentados en `docs/EVENTOS.md`.
 - [ ] Si se tocó el agente: suite adversaria en verde y métricas de tokens registradas.
 - [ ] Comentarios de flujo y `docs/FLUJOS.md` al día.
-- [ ] ROADMAP marcado y grafo de Graphify actualizado.
+- [ ] ROADMAP marcado. Si la tarea cierra una fase (o cambia la arquitectura), grafo de Graphify actualizado.
 
 ## Prohibido
 
