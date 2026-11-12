@@ -170,13 +170,18 @@ public sealed partial class ClienteOpenAiCompatibleHttp(HttpClient http, IOption
 
     /// <summary>
     /// Quita lo que algunos modelos agregan alrededor del JSON: el razonamiento de Qwen entre
-    /// &lt;think&gt; y &lt;/think&gt;, y los bloques ```json de Markdown.
+    /// &lt;think&gt; y &lt;/think&gt;, los bloques ```json de Markdown y el texto antes o después del objeto.
+    /// Solo recorta: lo que quede pasa por la misma validación estricta que con cualquier proveedor.
     /// </summary>
     public static string LimpiarTexto(string texto)
     {
         var limpio = PatronPensamiento().Replace(texto, string.Empty).Trim();
         var bloque = PatronBloqueCodigo().Match(limpio);
-        return bloque.Success ? bloque.Groups["json"].Value.Trim() : limpio;
+        if (bloque.Success) return bloque.Groups["json"].Value.Trim();
+
+        var inicio = limpio.IndexOf('{', StringComparison.Ordinal);
+        var fin = limpio.LastIndexOf('}');
+        return inicio > 0 && fin > inicio ? limpio[inicio..(fin + 1)] : limpio;
     }
 
     [GeneratedRegex(@"<think>.*?</think>", RegexOptions.Singleline)]

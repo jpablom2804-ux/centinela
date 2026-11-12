@@ -15,7 +15,7 @@ public static class ClasificadorErroresHttp
     {
         ArgumentNullException.ThrowIfNull(respuesta);
         var codigo = (int)respuesta.StatusCode;
-        var (tipoApi, mensajeApi) = LeerError(cuerpo);
+        var (tipoApi, mensajeApi, codigoApi) = LeerError(cuerpo);
         var espera = respuesta.Headers.RetryAfter?.Delta;
 
         // Saldo agotado: 402 (Anthropic billing_error, OpenRouter), o 400 con ese mensaje en algunas cuentas.
@@ -34,25 +34,36 @@ public static class ClasificadorErroresHttp
                 HttpStatusCode.Conflict => (TipoErrorLlm.ErrorServidor, true),
                 _ when codigo == 529 => (TipoErrorLlm.Saturado, true),
                 _ when codigo >= 500 => (TipoErrorLlm.ErrorServidor, true),
+                _ when codigo == 400 && codigoApi == "tool_use_failed" => (TipoErrorLlm.GeneracionInvalida, true),
                 _ => (TipoErrorLlm.SolicitudInvalida, false),
             };
 
-        return new ErrorLlmException(tipo, reintentable, codigo, espera);
+        return new ErrorLlmException(tipo, reintentable, codigo, espera, codigoApi: codigoApi);
     }
 
-    /// <summary>Lee tipo y mensaje del error. Los dos formatos ponen el detalle dentro de "error".</summary>
-    private static (string Tipo, string Mensaje) LeerError(string cuerpo)
+    /// <summary>
+    /// Lee tipo, mensaje y código del error (los formatos ponen el detalle dentro de "error"). El mensaje solo
+    /// se usa para clasificar; hacia afuera sale únicamente un código corto, porque algunos proveedores
+    /// incluyen en el error lo que generó el modelo, que puede traer texto del ticket.
+    /// </summary>
+    private static (string Tipo, string Mensaje, string? Codigo) LeerError(string cuerpo)
     {
         try
         {
             var error = JsonNode.Parse(cuerpo)?["error"];
-            var tipo = error?["type"] is JsonValue t && t.TryGetValue<string>(out var s) ? s : string.Empty;
-            var mensaje = error?["message"] is JsonValue m && m.TryGetValue<string>(out var x) ? x : string.Empty;
-            return (tipo, mensaje);
+            var tipo = Texto(error?["type"]);
+            var mensaje = Texto(error?["message"]);
+            var codigo = Texto(error?["code"]) is { Length: > 0 } c ? c : tipo;
+            return (tipo, mensaje, EsCodigoSeguro(codigo) ? codigo : null);
         }
         catch (JsonException)
         {
-            return (string.Empty, string.Empty);
+            return (string.Empty, string.Empty, null);
         }
     }
+
+    private static string Texto(JsonNode? nodo) => nodo is JsonValue v && v.TryGetValue<string>(out var s) ? s : string.Empty;
+
+    private static bool EsCodigoSeguro(string codigo) =>
+        codigo.Length is > 0 and <= 40 && codigo.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-' or '.');
 }

@@ -36,7 +36,7 @@ public class CicloAgenteTests
     [Fact]
     public async Task Respuesta_que_no_es_json_queda_invalida_y_sin_sugerencia()
     {
-        var cliente = new ClienteLlmFalso().Responde(Respuestas.Final("Le pondría P2, creo."));
+        var cliente = new ClienteLlmFalso().RespondeSiempre(_ => Respuestas.Final("Le pondría P2, creo."));
 
         var resultado = await Fabrica.Ciclo(cliente).TriarAsync(Fabrica.TicketVpn(), CancellationToken.None);
 
@@ -49,7 +49,7 @@ public class CicloAgenteTests
     [InlineData("urgente")]
     public async Task Prioridad_fuera_del_catalogo_queda_invalida(string prioridad)
     {
-        var cliente = new ClienteLlmFalso().Responde(Respuestas.Final(Respuestas.TriajeVpn(prioridad)));
+        var cliente = new ClienteLlmFalso().RespondeSiempre(_ => Respuestas.Final(Respuestas.TriajeVpn(prioridad)));
 
         var resultado = await Fabrica.Ciclo(cliente).TriarAsync(Fabrica.TicketVpn(), CancellationToken.None);
 
@@ -60,7 +60,7 @@ public class CicloAgenteTests
     public async Task Duplicado_que_no_devolvio_ninguna_herramienta_queda_invalido()
     {
         // El modelo "inventa" un ID sin haber buscado: no se acepta.
-        var cliente = new ClienteLlmFalso().Responde(Respuestas.Final(Respuestas.TriajeVpn(duplicados: ["TK-1001"])));
+        var cliente = new ClienteLlmFalso().RespondeSiempre(_ => Respuestas.Final(Respuestas.TriajeVpn(duplicados: ["TK-1001"])));
 
         var resultado = await Fabrica.Ciclo(cliente).TriarAsync(Fabrica.TicketVpn(), CancellationToken.None);
 
@@ -201,7 +201,7 @@ public class CicloAgenteTests
     {
         var cliente = new ClienteLlmFalso()
             .Responde(Respuestas.Herramienta("buscar_tickets_similares", BuscarVpn))
-            .Responde(Respuestas.Final("no es json"));
+            .RespondeSiempre(_ => Respuestas.Final("no es json"));
         var logger = new LoggerCapturador<CicloAgente>();
         var ticket = Fabrica.TicketVpn("Texto distintivo zxq-ticket-privado que no debe aparecer en los logs.");
 
@@ -209,5 +209,40 @@ public class CicloAgenteTests
 
         Assert.NotEmpty(logger.Registros);
         Assert.DoesNotContain(logger.Registros, r => r.Mensaje.Contains("zxq-ticket-privado", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Una_respuesta_invalida_recibe_un_turno_de_correccion_y_puede_completar()
+    {
+        // Lo que hace Qwen a veces: escribir las llamadas como texto en vez de usar el canal de herramientas.
+        const string LlamadasComoTexto = """{"name":"buscar_tickets_similares","arguments":{"consulta":"vpn zxq-texto-del-modelo"}}{"name":"x"}""";
+        var cliente = new ClienteLlmFalso()
+            .Responde(Respuestas.Final(LlamadasComoTexto))
+            .Responde(Respuestas.Final(Respuestas.TriajeVpn()));
+
+        var resultado = await Fabrica.Ciclo(cliente).TriarAsync(Fabrica.TicketVpn(), CancellationToken.None);
+
+        Assert.Equal(EstadoAnalisis.Completado, resultado.Estado);
+        Assert.Equal(2, resultado.Metricas.Iteraciones);
+        var correccion = Assert.IsType<MensajeUsuario>(cliente.Solicitudes[1].Mensajes[^1]).Texto;
+        Assert.Contains("no cumple el contrato", correccion, StringComparison.Ordinal);
+        // La corrección nunca repite lo que escribió el modelo: es texto no confiable.
+        Assert.DoesNotContain("zxq-texto-del-modelo", correccion, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Las_correcciones_tienen_maximo_y_sin_ellas_queda_invalido()
+    {
+        var cliente = new ClienteLlmFalso().RespondeSiempre(_ => Respuestas.Final("sigue sin ser json"));
+
+        var conUna = await Fabrica.Ciclo(cliente).TriarAsync(Fabrica.TicketVpn(), CancellationToken.None);
+        var sinCorreccion = new ClienteLlmFalso().RespondeSiempre(_ => Respuestas.Final("sigue sin ser json"));
+        var conCero = await Fabrica.Ciclo(sinCorreccion, new OpcionesAgente { MaxReparaciones = 0, BackoffBaseMs = 1 })
+            .TriarAsync(Fabrica.TicketVpn(), CancellationToken.None);
+
+        Assert.Equal(EstadoAnalisis.Invalido, conUna.Estado);
+        Assert.Equal(2, cliente.Solicitudes.Count);
+        Assert.Equal(EstadoAnalisis.Invalido, conCero.Estado);
+        Assert.Single(sinCorreccion.Solicitudes);
     }
 }

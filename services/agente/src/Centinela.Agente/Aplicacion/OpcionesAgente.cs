@@ -21,4 +21,8 @@ public sealed class OpcionesAgente
 
     [Range(0, 60_000)]
     public int BackoffBaseMs { get; set; } = 1_000;
+
+    /// <summary>Turnos de corrección si la respuesta final no pasa la validación (0 = ninguno). Cuentan en el presupuesto.</summary>
+    [Range(0, 3)]
+    public int MaxReparaciones { get; set; } = 1;
 }

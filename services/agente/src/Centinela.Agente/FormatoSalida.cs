@@ -1,4 +1,6 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 using Centinela.Agente.Dominio;
 
 namespace Centinela.Agente;
@@ -14,7 +16,12 @@ public static class FormatoSalida
 {
     public static readonly JsonSerializerOptions Opciones = new(JsonSerializerDefaults.Web);
 
-    public static readonly JsonSerializerOptions OpcionesIndentadas = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    // Acentos legibles en la salida; los caracteres sensibles para HTML (< > & ') siguen escapados.
+    public static readonly JsonSerializerOptions OpcionesIndentadas = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+    };
 
     public static string Estado(EstadoAnalisis estado) => estado switch
     {

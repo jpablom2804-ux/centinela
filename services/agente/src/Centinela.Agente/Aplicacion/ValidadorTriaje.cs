@@ -49,9 +49,11 @@ public static class ValidadorTriaje
             using var documento = JsonDocument.Parse(texto);
             raiz = documento.RootElement.Clone();
         }
-        catch (JsonException)
+        catch (JsonException e)
         {
-            return Invalido("la respuesta no es JSON");
+            // Solo la forma del error, nunca el contenido: es texto generado por el modelo.
+            var inicio = texto.Length == 0 ? "vacía" : texto[0] is '{' or '[' or '"' ? $"empieza con '{texto[0]}'" : "empieza con texto";
+            return Invalido($"la respuesta no es JSON ({texto.Length} caracteres, {inicio}, error en la posición {e.BytePositionInLine})");
         }
 
         if (raiz.ValueKind != JsonValueKind.Object) return Invalido("la respuesta no es un objeto JSON");

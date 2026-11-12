@@ -46,11 +46,11 @@ public sealed partial class CicloAgente(
             if (e.RequiereAlerta)
             {
                 // Saldo, key o permisos: ningún reintento lo arregla y alguien tiene que actuar.
-                AlertaApiModelo(logger, ticket.TicketId, e.Tipo, e.CodigoHttp);
+                AlertaApiModelo(logger, ticket.TicketId, e.Tipo, e.CodigoHttp, e.CodigoApi ?? "-");
             }
             else
             {
-                ErrorApiModelo(logger, ticket.TicketId, e.Tipo, e.CodigoHttp);
+                ErrorApiModelo(logger, ticket.TicketId, e.Tipo, e.CodigoHttp, e.CodigoApi ?? "-");
             }
 
             resultado = SinSugerencia(ticket, EstadoAnalisis.Error, estado);
@@ -89,7 +89,24 @@ public sealed partial class CicloAgente(
             switch (respuesta.Motivo)
             {
                 case MotivoParada.Final:
-                    return Finalizar(ticket, respuesta.Texto, estado);
+                    var validacion = ValidadorTriaje.Validar(respuesta.Texto, estado.IdsVistos);
+                    if (validacion.EsValido)
+                    {
+                        return ResultadoTriaje.Completado(ticket.TicketId, validacion.Sugerencia!, estado.Metricas(reloj));
+                    }
+
+                    RespuestaDescartada(logger, ticket.TicketId, string.Join("; ", validacion.Errores));
+                    if (estado.Reparaciones >= _opciones.MaxReparaciones)
+                    {
+                        return SinSugerencia(ticket, EstadoAnalisis.Invalido, estado);
+                    }
+
+                    // [FLUJO TRIAJE_AGENTE 7b] Turno de corrección: le dice al modelo qué falló (con mensajes propios,
+                    // sin repetir su texto) y le da otra oportunidad dentro del mismo presupuesto → vuelve al paso 3
+                    estado.Reparaciones++;
+                    mensajes.Add(new MensajeAsistente(respuesta.ContenidoProveedor));
+                    mensajes.Add(new MensajeUsuario(Prompts.MensajeCorreccion(validacion.Errores)));
+                    break;
 
                 case MotivoParada.UsoHerramientas when respuesta.Llamadas.Count > 0:
                     mensajes.Add(new MensajeAsistente(respuesta.ContenidoProveedor));
@@ -124,7 +141,7 @@ public sealed partial class CicloAgente(
             catch (ErrorLlmException e) when (e.Reintentable && intento < _opciones.MaxReintentos)
             {
                 var espera = e.EsperaSugerida ?? TimeSpan.FromMilliseconds(_opciones.BackoffBaseMs * Math.Pow(2, intento));
-                Reintento(logger, e.Tipo, intento + 1, (long)espera.TotalMilliseconds);
+                Reintento(logger, e.Tipo, e.CodigoApi ?? "-", intento + 1, (long)espera.TotalMilliseconds);
                 await Task.Delay(espera, reloj, ct).ConfigureAwait(false);
             }
         }
@@ -165,17 +182,6 @@ public sealed partial class CicloAgente(
         return resultados;
     }
 
-    private ResultadoTriaje Finalizar(Ticket ticket, string texto, EstadoCiclo estado)
-    {
-        var validacion = ValidadorTriaje.Validar(texto, estado.IdsVistos);
-        if (!validacion.EsValido)
-        {
-            RespuestaDescartada(logger, ticket.TicketId, string.Join("; ", validacion.Errores));
-            return SinSugerencia(ticket, EstadoAnalisis.Invalido, estado);
-        }
-
-        return ResultadoTriaje.Completado(ticket.TicketId, validacion.Sugerencia!, estado.Metricas(reloj));
-    }
 
     private static HashSet<string> DetectarDatosSensibles(IEnumerable<MensajeConversacion> mensajes)
     {
@@ -207,6 +213,7 @@ public sealed partial class CicloAgente(
         public int TokensSalida { get; private set; }
         public string Modelo { get; private set; } = "sin llamada";
         public HashSet<string> IdsVistos { get; } = new(StringComparer.Ordinal);
+        public int Reparaciones { get; set; }
         public int TokensTotales => TokensEntrada + TokensSalida;
 
         public void Registrar(RespuestaLlm respuesta)
@@ -239,12 +246,12 @@ public sealed partial class CicloAgente(
     [LoggerMessage(EventId = 208, Level = LogLevel.Error, Message = "Ticket {TicketId}: la herramienta {Herramienta} lanzó {TipoExcepcion}")]
     private static partial void HerramientaFallo(ILogger logger, Guid ticketId, string herramienta, string tipoExcepcion);
 
-    [LoggerMessage(EventId = 205, Level = LogLevel.Warning, Message = "Error reintentable de la API del modelo ({Tipo}); reintento {Intento} en {EsperaMs} ms")]
-    private static partial void Reintento(ILogger logger, TipoErrorLlm tipo, int intento, long esperaMs);
+    [LoggerMessage(EventId = 205, Level = LogLevel.Warning, Message = "Error reintentable de la API del modelo ({Tipo}, {CodigoApi}); reintento {Intento} en {EsperaMs} ms")]
+    private static partial void Reintento(ILogger logger, TipoErrorLlm tipo, string codigoApi, int intento, long esperaMs);
 
-    [LoggerMessage(EventId = 206, Level = LogLevel.Error, Message = "Ticket {TicketId}: error de la API del modelo ({Tipo}, HTTP {CodigoHttp}); pasa a triaje manual")]
-    private static partial void ErrorApiModelo(ILogger logger, Guid ticketId, TipoErrorLlm tipo, int? codigoHttp);
+    [LoggerMessage(EventId = 206, Level = LogLevel.Error, Message = "Ticket {TicketId}: error de la API del modelo ({Tipo}, HTTP {CodigoHttp}, {CodigoApi}); pasa a triaje manual")]
+    private static partial void ErrorApiModelo(ILogger logger, Guid ticketId, TipoErrorLlm tipo, int? codigoHttp, string codigoApi);
 
-    [LoggerMessage(EventId = 207, Level = LogLevel.Critical, Message = "ALERTA ticket {TicketId}: la API del modelo no se puede usar ({Tipo}, HTTP {CodigoHttp}). Revisar saldo, API key o permisos")]
-    private static partial void AlertaApiModelo(ILogger logger, Guid ticketId, TipoErrorLlm tipo, int? codigoHttp);
+    [LoggerMessage(EventId = 207, Level = LogLevel.Critical, Message = "ALERTA ticket {TicketId}: la API del modelo no se puede usar ({Tipo}, HTTP {CodigoHttp}, {CodigoApi}). Revisar saldo, API key o permisos")]
+    private static partial void AlertaApiModelo(ILogger logger, Guid ticketId, TipoErrorLlm tipo, int? codigoHttp, string codigoApi);
 }

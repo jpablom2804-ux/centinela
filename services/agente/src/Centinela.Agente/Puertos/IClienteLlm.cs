@@ -68,18 +68,22 @@ public enum TipoErrorLlm
     ErrorServidor,
     Red,
     Timeout,
+
+    /// <summary>El modelo armó mal una llamada a herramienta (Groq: tool_use_failed). Otra muestra suele salir bien.</summary>
+    GeneracionInvalida,
 }
 
 /// <summary>Error de la API del modelo ya clasificado: el ciclo decide si reintentar según <see cref="Reintentable"/>.</summary>
 public sealed class ErrorLlmException : Exception
 {
-    public ErrorLlmException(TipoErrorLlm tipo, bool reintentable, int? codigoHttp = null, TimeSpan? esperaSugerida = null, Exception? causa = null)
-        : base($"Error de la API del modelo: {tipo} (HTTP {codigoHttp?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"})", causa)
+    public ErrorLlmException(TipoErrorLlm tipo, bool reintentable, int? codigoHttp = null, TimeSpan? esperaSugerida = null, Exception? causa = null, string? codigoApi = null)
+        : base($"Error de la API del modelo: {tipo} (HTTP {codigoHttp?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}, {codigoApi ?? "-"})", causa)
     {
         Tipo = tipo;
         Reintentable = reintentable;
         CodigoHttp = codigoHttp;
         EsperaSugerida = esperaSugerida;
+        CodigoApi = codigoApi;
     }
 
     public ErrorLlmException()
@@ -101,6 +105,9 @@ public sealed class ErrorLlmException : Exception
     public bool Reintentable { get; }
     public int? CodigoHttp { get; }
     public TimeSpan? EsperaSugerida { get; }
+
+    /// <summary>Código corto del proveedor (por ejemplo "rate_limit_exceeded"). Nunca el mensaje ni el cuerpo del error.</summary>
+    public string? CodigoApi { get; }
 
     /// <summary>Errores que ningún reintento arregla y que alguien tiene que atender (saldo, credenciales).</summary>
     public bool RequiereAlerta => Tipo is TipoErrorLlm.SaldoInsuficiente or TipoErrorLlm.Autenticacion or TipoErrorLlm.Permiso;

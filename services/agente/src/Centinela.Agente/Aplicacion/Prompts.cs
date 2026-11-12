@@ -38,6 +38,18 @@ public static class Prompts
                $"{EtiquetaApertura}\n{json}\n{EtiquetaCierre}";
     }
 
+    /// <summary>
+    /// Corrección después de una respuesta inválida. Solo usa los mensajes del validador (texto propio):
+    /// nunca repite lo que escribió el modelo.
+    /// </summary>
+    public static string MensajeCorreccion(IReadOnlyList<string> errores)
+    {
+        ArgumentNullException.ThrowIfNull(errores);
+        return "Tu respuesta final no cumple el contrato: " + string.Join("; ", errores) + ". " +
+               "Si te falta información, usa las herramientas con el mecanismo de herramientas, no escribiendo la llamada como texto. " +
+               "Si ya la tienes, responde de nuevo solo con el objeto JSON del esquema, sin texto antes ni después.";
+    }
+
     private static string CargarSistema()
     {
         using var recurso = typeof(Prompts).Assembly.GetManifestResourceStream("Centinela.Agente.Prompts.sistema.md")

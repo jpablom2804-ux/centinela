@@ -24,4 +24,5 @@ Servicio `agente`, rutas bajo `services/agente/src/Centinela.Agente/`.
 | 6 | `Aplicacion/CicloAgente.cs` | `EjecutarHerramientasAsync` | Ejecuta las herramientas pedidas con el contexto inyectado y devuelve todos los resultados juntos; vuelve al paso 3 |
 | 6b | `Infraestructura/Herramientas/Herramienta*.cs` | `EjecutarAsync` | Valida la entrada que eligió el modelo y busca en los datos de prueba; el resultado va marcado como dato no confiable |
 | 7 | `Aplicacion/ValidadorTriaje.cs` | `Validar` | Valida el JSON final contra catálogos, largos e IDs vistos en las herramientas: `completado` o `invalido` |
+| 7b | `Aplicacion/CicloAgente.cs` | `EjecutarAsync` | Si no valida y quedan correcciones (`Agente:MaxReparaciones`, 1 por defecto), le dice al modelo qué falló con mensajes propios, sin repetir su texto, y vuelve al paso 3 dentro del mismo presupuesto |
 | 8 | `Aplicacion/RegistroMetricas.cs` | `Registrar` | Registra estado, modelo, tokens, iteraciones y duración (solo IDs y números); `Program` imprime el resultado |

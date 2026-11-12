@@ -136,6 +136,8 @@ public class ClienteOpenAiCompatibleHttpTests
     [InlineData("```json\n{\"a\":1}\n```", "{\"a\":1}")]
     [InlineData("<think>x</think>```\n{\"a\":1}\n```", "{\"a\":1}")]
     [InlineData("{\"a\":1}", "{\"a\":1}")]
+    [InlineData("Aquí está el triaje: {\"a\":1} Espero que sirva.", "{\"a\":1}")]
+    [InlineData("no hay json aquí", "no hay json aquí")]
     public void Limpia_razonamiento_y_bloques_de_markdown(string contenido, string esperado)
     {
         Assert.Equal(esperado, ClienteOpenAiCompatibleHttp.LimpiarTexto(contenido));
@@ -146,6 +148,7 @@ public class ClienteOpenAiCompatibleHttpTests
     [InlineData(401, """{"error":{"message":"Invalid API key"}}""", TipoErrorLlm.Autenticacion, false)]
     [InlineData(429, """{"error":{"message":"Rate limit exceeded: free-models-per-day"}}""", TipoErrorLlm.LimiteTasa, true)]
     [InlineData(503, "no es json", TipoErrorLlm.ErrorServidor, true)]
+    [InlineData(400, """{"error":{"message":"Failed to call a function","type":"invalid_request_error","code":"tool_use_failed","failed_generation":"texto del modelo"}}""", TipoErrorLlm.GeneracionInvalida, true)]
     public async Task Clasifica_los_errores_igual_que_el_adaptador_de_anthropic(int codigo, string cuerpo, TipoErrorLlm tipo, bool reintentable)
     {
         var manejador = new ManejadorEnSecuencia(((HttpStatusCode)codigo, cuerpo));
