@@ -4,13 +4,14 @@ name: centinela
 
 services:
   postgres:
-    image: postgres:18
+    # PostgreSQL 18 con la extensión pgvector ya instalada (búsqueda por significado).
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?falta POSTGRES_DB en .env}
       POSTGRES_USER: ${POSTGRES_USER:?falta POSTGRES_USER en .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env}
-      SIMULADOR_DB_PASSWORD: ${SIMULADOR_DB_PASSWORD:?falta SIMULADOR_DB_PASSWORD en .env}
-      DETECCION_DB_PASSWORD: ${DETECCION_DB_PASSWORD:?falta DETECCION_DB_PASSWORD en .env}
+      MESA_SERVICIO_DB_PASSWORD: ${MESA_SERVICIO_DB_PASSWORD:?falta MESA_SERVICIO_DB_PASSWORD en .env}
+      MESA_SERVICIO_APP_DB_PASSWORD: ${MESA_SERVICIO_APP_DB_PASSWORD:?falta MESA_SERVICIO_APP_DB_PASSWORD en .env}
       AGENTE_DB_PASSWORD: ${AGENTE_DB_PASSWORD:?falta AGENTE_DB_PASSWORD en .env}
       POWERBI_RO_DB_PASSWORD: ${POWERBI_RO_DB_PASSWORD:?falta POWERBI_RO_DB_PASSWORD en .env}
     ports:

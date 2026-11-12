@@ -2,7 +2,7 @@
 
 Reglas para cualquier agente que trabaje en este repositorio (Claude Code, Cursor, Copilot). Responder siempre en español.
 
-La base es el skill `buenas-practicas-java-react`. En Claude Code se usa la versión sincronizada, `anthropic-skills:buenas-practicas-java-react`, no la copia antigua de `~/.claude/skills/`. Este archivo manda sobre el skill: agrega el perfil del proyecto, las equivalencias para C# y las reglas específicas de agentes de IA y mensajería.
+La base es el skill `buenas-practicas-java-react`. En Claude Code se usa la versión sincronizada, `anthropic-skills:buenas-practicas-java-react`, no la copia antigua de `~/.claude/skills/`. Este archivo manda sobre el skill: agrega el perfil del proyecto, las equivalencias para C# y las reglas específicas del dominio, del agente de IA y de mensajería.
 
 ## Antes de cualquier tarea
 
@@ -15,35 +15,44 @@ La base es el skill `buenas-practicas-java-react`. En Claude Code se usa la vers
 
 | Campo | Valor |
 |---|---|
-| Qué es | Análisis antifraude asistido: reglas filtran, un agente de IA investiga y recomienda, un analista humano decide |
+| Qué es | Mesa de servicio de TI para entidades financieras: tickets, SLA, tablero Kanban, gestión de cambios y auditoría, con triaje asistido por IA. El agente recomienda; el técnico decide |
 | Propósito | Portafolio para un puesto de desarrollador backend con integración de IA |
-| Datos | 100 % sintéticos (generador propio o PaySim). Nunca datos reales de personas ni de clientes |
+| Datos | 100 % sintéticos. Inspirados en tipos de casos reales de soporte, nunca copiados. Nunca datos reales de personas ni de clientes |
 | Tamaño | Mediano |
 | Equipo | 1 persona (Juan Pablo) |
-| Arquitectura | Microservicios mínimos orientados a eventos — ADR-001 |
-| Lenguajes | Java + Spring Boot (`simulador`, `deteccion`), C# .NET (`agente`), React + TypeScript (`frontend`) — ADR-002 |
-| Base de datos | PostgreSQL. Un usuario por servicio, dueño de sus esquemas: `simulador`, `deteccion` (más `reportes`), `agente`. Usuario `powerbi_ro` de solo lectura sobre `reportes` |
-| Mensajería | RabbitMQ |
+| Arquitectura | Monolito modular + agente como servicio aparte con RabbitMQ — ADR-003 |
+| Lenguajes | Java + Spring Boot (`mesa-servicio`, `generador`), C# .NET (`agente`), React + TypeScript (`frontend`) — ADR-002 |
+| Base de datos | PostgreSQL + pgvector. `mesa-servicio` tiene dos roles: `mesa_servicio` (dueño de los esquemas, solo para Flyway) y `mesa_servicio_app` (con el que corre). `agente` tiene su propio usuario y esquema. `powerbi_ro` solo lee `reportes` |
+| Mensajería | RabbitMQ, solo para lo que cruza servicios |
 | Despliegue | Contenedores: compose en desarrollo → servidor Rocky Linux con nginx como reverse proxy → Kubernetes (k3s o kind) |
 | Sistema destino | Rocky Linux (compatible con RHEL: aplican las reglas [RHEL] del skill) |
-| Autenticación | OIDC con Keycloak para analistas (fase 4). Sin login hecho a mano |
-| Maneja dinero | Sí |
-| Usuarios | Analistas de fraude (simulados) |
-| Integraciones | API de LLM (Anthropic), RabbitMQ, Power BI (solo lectura) |
+| Autenticación | OIDC con Keycloak (fase 4). Roles: `solicitante`, `tecnico`, `coordinador`, `aprobador_cambios`, `auditor`. Sin login hecho a mano |
+| Maneja dinero | No directamente. Si aparecen montos (por ejemplo, el costo de un cambio o del agente), aplican las reglas de dinero del skill |
+| Usuarios | Empleados que reportan, técnicos de soporte, coordinadores, comité de cambios, auditoría (simulados) |
+| Integraciones | API de LLM (Anthropic), proveedor de embeddings (a decidir en la fase 3), RabbitMQ, Power BI (solo lectura) |
 
-## Arquitectura (resumen de ADR-001)
+## Arquitectura (resumen de ADR-003)
 
-- Servicios: `services/simulador`, `services/deteccion`, `services/agente`, `frontend`. Detalle en `docs/ARQUITECTURA.md`.
-- Cada servicio es dueño de sus esquemas (`deteccion` es dueño de `deteccion` y `reportes`). **Prohibido** leer o escribir tablas de otro servicio.
-- Entre servicios: eventos de RabbitMQ (`docs/EVENTOS.md`). Única llamada síncrona permitida: `agente` → API interna de solo lectura de `deteccion`.
-- `deteccion` es un monolito modular (`ingesta`, `reglas`, `casos`, `reportes`). Un módulo solo usa el `api/` de otro, nunca su `internal/`.
+- Servicios: `services/mesa-servicio`, `services/agente`, `frontend` y la herramienta de desarrollo `tools/generador` (no es parte del producto). Detalle en `docs/ARQUITECTURA.md`.
+- Cada servicio es dueño de sus esquemas. **Prohibido** leer o escribir tablas de otro servicio. El `generador` crea tickets por la API de `mesa-servicio` y no tiene usuario de BD.
+- Entre servicios: eventos de RabbitMQ (`docs/EVENTOS.md`). Única llamada síncrona permitida: `agente` → API interna de solo lectura de `mesa-servicio`.
+- Dentro de `mesa-servicio`, los eventos entre módulos (por ejemplo, los de SLA) son eventos de aplicación en memoria, no mensajes del broker.
+- `mesa-servicio` es un monolito modular (`tickets`, `sla`, `tablero`, `cambios`, `conocimiento`, `auditoria`, `reportes`). Un módulo solo usa el `api/` de otro, nunca su `internal/`.
 - `agente` es hexagonal ligero: el dominio no importa nada de HTTP, RabbitMQ ni del proveedor de LLM.
-- `simulador` usa capas clásicas.
+- `generador` usa capas clásicas.
 - Cambiar o mezclar estilos requiere un ADR nuevo aprobado.
+
+## Reglas de dominio
+
+- **Auditoría de solo inserción.** Toda acción queda en la bitácora de `auditoria` (quién, qué, cuándo, antes y después). `mesa_servicio_app` solo tiene `SELECT` e `INSERT` sobre ese esquema; nunca `UPDATE`, `DELETE` ni `TRUNCATE`.
+- **Segregación de funciones** validada en el backend: en un cambio, solicitante ≠ aprobador ≠ ejecutor.
+- **Relojes de SLA** en UTC, con calendario laboral configurable. Se pausan en `en_espera` y cada pausa queda auditada.
+- **Un ticket cerrado no se edita:** se reabre con justificación.
+- **Control de acceso por rol y por recurso,** verificado en el backend: un solicitante solo ve sus tickets.
 
 ## Principios y anti‑sobreingeniería
 
-Se aplican tal cual las del skill: SOLID, DRY, KISS, YAGNI, composición sobre herencia, fail fast; la arquitectura más simple que cubra los requisitos reales; nada de interfaces de una sola implementación salvo en fronteras reales (BD, LLM, broker, APIs externas) o cuando un test lo necesite; no generalizar antes de tres casos parecidos; cada clase, capa o dependencia nueva lleva una justificación de una línea; avisar si un cambio simple obliga a tocar más de 4 o 5 archivos.
+Se aplican tal cual las del skill: SOLID, DRY, KISS, YAGNI, composición sobre herencia, fail fast; la arquitectura más simple que cubra los requisitos reales; nada de interfaces de una sola implementación salvo en fronteras reales (BD, LLM, embeddings, broker, APIs externas) o cuando un test lo necesite; no generalizar antes de tres casos parecidos; cada clase, capa o dependencia nueva lleva una justificación de una línea; avisar si un cambio simple obliga a tocar más de 4 o 5 archivos.
 
 ## Equivalencias para C# (servicio `agente`)
 
@@ -63,26 +72,28 @@ Se aplican tal cual las del skill: SOLID, DRY, KISS, YAGNI, composición sobre h
 
 ## Reglas del agente de IA (OWASP LLM y Agentic Top 10)
 
-- **El agente nunca actúa, solo recomienda.** No tiene herramientas que escriban, bloqueen cuentas ni muevan dinero. La decisión final siempre es de un humano.
-- **Herramientas mínimas y de solo lectura.** Cada herramienta tiene un propósito, parámetros validados y límites (por ejemplo, máximo de transacciones devueltas). Agregar una herramienta requiere justificarla y actualizar `docs/SEGURIDAD.md`.
-- **El modelo nunca elige de quién son los datos.** Las herramientas no reciben `clienteId` ni `casoId` como parámetro del modelo: el ciclo los toma del caso en curso, y la API interna de `deteccion` se consulta por `casoId` y deduce el cliente.
-- **Todo dato de una transacción es no confiable.** Descripciones, nombres de comercio y cualquier texto van delimitados como datos, nunca concatenados en las instrucciones del sistema.
-- **Salida estructurada y validada.** El agente responde JSON que se valida contra un esquema. Si no valida, el caso pasa a revisión manual sin recomendación. Nunca se aprueba por defecto.
-- **Límites por caso:** máximo de iteraciones del ciclo, tiempo máximo y presupuesto de tokens. Al superarlos, el caso va a revisión manual.
-- **Tope diario de tokens** en `agente` (desde la fase 3): al alcanzarlo, los casos pasan a revisión manual sin llamar al modelo. La alerta de **costo** diario (en dinero) la calcula `reportes`, que es quien conoce los precios.
-- **Salida acotada:** `hallazgos` y `resumen` son texto generado por el modelo, o sea no confiable. Tienen largo máximo (`docs/EVENTOS.md`), se validan al recibirse y se muestran como texto plano.
-- **Medir siempre:** tokens de entrada y salida, modelo, duración e iteraciones de cada caso (ver `docs/KPIS.md`).
-- **Modelo y precios por configuración**, nunca en el código.
-- **La API key solo vive en variables de entorno o Secrets.** No se registran en logs los prompts completos ni las respuestas crudas; solo IDs y métricas.
+- **El agente nunca actúa, solo recomienda.** No asigna, no cambia prioridad, no cierra tickets ni envía respuestas. Todo lo aplica un humano.
+- **La prioridad sugerida nunca se aplica sola,** aunque el agente diga P1.
+- **Herramientas mínimas y de solo lectura:** `buscar_tickets_similares`, `buscar_articulos_conocimiento`, `consultar_estado_servicio` (incidentes abiertos por sistema). Cada una con propósito, parámetros validados y límite de resultados. Agregar una herramienta requiere justificarla y actualizar `docs/SEGURIDAD.md`.
+- **El modelo nunca elige el ticket en curso.** Las herramientas no reciben `ticketId` del modelo: el ciclo lo toma del ticket que se está triando.
+- **Enmascarar antes del LLM:** cédulas, números de cuenta y de tarjeta, correos y teléfonos. `mesa-servicio` enmascara antes de publicar el evento y en todo lo que devuelve la API interna; el agente vuelve a verificar antes de cada llamada al modelo. Lo mismo aplica al proveedor de embeddings.
+- **El texto del ticket es no confiable,** igual que los tickets similares y los artículos de conocimiento. Va delimitado como datos, nunca concatenado a las instrucciones del sistema.
+- **Salida estructurada y validada.** JSON validado contra un esquema: categoría, sistema afectado, prioridad sugerida con justificación, posibles duplicados, artículos sugeridos y borrador de respuesta. Si no valida, el ticket queda sin sugerencia para triaje manual.
+- **Salida acotada:** `justificacion` y `borradorRespuesta` los genera el modelo, así que son texto no confiable. Tienen largo máximo (`docs/EVENTOS.md`), se validan al recibirse y se muestran como texto plano. El borrador solo se envía si un técnico lo aprueba.
+- **Límites por ticket:** máximo de iteraciones, tiempo y presupuesto de tokens. Al superarlos, triaje manual.
+- **Tope diario de tokens** en `agente` (desde la fase 3): al alcanzarlo, los tickets pasan a triaje manual sin llamar al modelo. La alerta de **costo** diario (en dinero) la calcula `reportes`, que es quien conoce los precios.
+- **Medir siempre:** tokens de entrada y salida, modelo, duración e iteraciones de cada ticket (ver `docs/KPIS.md`).
+- **Modelo, umbrales y precios por configuración**, nunca en el código.
+- **La API key solo vive en variables de entorno o Secrets.** No se registran en logs los prompts completos, los textos de tickets ni las respuestas crudas; solo IDs y métricas.
 - **Todo cambio de prompt, herramienta o modelo obliga a correr la suite adversaria** (`tests/adversarial/`) antes de darlo por terminado.
 
 ## Reglas de mensajería
 
 - Todo mensaje lleva `id`, `tipo`, `version`, `correlationId` y `ocurridoEn` (ISO-8601 UTC). Contratos en `docs/EVENTOS.md`; un cambio incompatible sube la versión.
-- Consumidores idempotentes: registrar el `id` procesado y descartar duplicados. El `agente` además deduplica por `casoId`: un caso ya analizado no vuelve a llamar al modelo (evita pagar dos veces si se cae antes del ack o si hay varias réplicas).
+- Consumidores idempotentes: registrar el `id` procesado y descartar duplicados. El `agente` además deduplica por `ticketId`: un ticket ya triado no vuelve a llamar al modelo (evita pagar dos veces si se cae antes del ack o si hay varias réplicas).
 - Reintentos con backoff y un máximo; después, a la DLQ. Nunca reintentos infinitos.
-- `deteccion` publica con outbox transaccional.
-- Montos en los mensajes como texto decimal (`"1250.00"`) más la moneda, nunca como número de punto flotante.
+- `mesa-servicio` publica con outbox transaccional.
+- Si un mensaje lleva montos: texto decimal (`"1250.00"`) más la moneda, nunca número de punto flotante.
 
 ## Comentarios de flujo — obligatorios siempre en el backend
 
@@ -104,6 +115,8 @@ Además de la lista del skill:
 - [ ] Compila y pasan los tests de los servicios tocados (`mvn verify` / `dotnet test` / `npm test`).
 - [ ] Sin `double`/`float` para dinero en Java, C#, eventos ni BD.
 - [ ] Ningún servicio accede a tablas de otro.
+- [ ] Nada sin enmascarar llega al LLM ni a los logs.
+- [ ] Acciones nuevas registradas en la bitácora de `auditoria`.
 - [ ] Mensajes nuevos o cambiados documentados en `docs/EVENTOS.md`.
 - [ ] Si se tocó el agente: suite adversaria en verde y métricas de tokens registradas.
 - [ ] Comentarios de flujo y `docs/FLUJOS.md` al día.
@@ -114,8 +127,10 @@ Además de la lista del skill:
 Todo lo prohibido en el skill, más:
 
 - Darle al agente herramientas de escritura o que ejecuten acciones.
-- Aprobar un caso automáticamente cuando el agente falla, se agota o devuelve algo inválido.
+- Aplicar automáticamente una sugerencia del agente (prioridad, asignación, cierre o respuesta).
+- Mandar al LLM o al proveedor de embeddings texto sin enmascarar.
+- Dar `UPDATE`, `DELETE` o `TRUNCATE` sobre `auditoria` al rol de la aplicación.
 - Compartir tablas o clases entre servicios.
 - Usar datos reales de personas.
-- Escribir la API key, el modelo o los precios en el código.
+- Escribir la API key, el modelo, los umbrales o los precios en el código.
 - Agregar un servicio nuevo sin un ADR aprobado.

@@ -29,9 +29,21 @@ El entorno de Juan Pablo:
 - **Se deja n8n.** El agente se programa a mano: el ciclo de llamada al modelo y uso de herramientas es lo que se quiere aprender y mostrar.
 - **Dominio: antifraude asistido** (sector financiero, con "peso" para el portafolio). Principio central: la IA analiza y recomienda; un humano decide. Ningún banco aceptaría un agente que mueva dinero solo.
 - **Control de tokens por arquitectura:** un motor de reglas barato filtra la gran mayoría y solo el 2–5 % sospechoso llega al agente. Además: caché, modelos baratos para tareas simples y límites por caso. Los tokens no desaparecen, se controlan.
-- **Arquitectura y lenguajes:** aprobados en ADR-001 y ADR-002 (Aceptados el 2026-11-11).
+- **Arquitectura y lenguajes:** aprobados en ADR-001 y ADR-002 (Aceptados el 2026-11-11). ADR-001 quedó reemplazado ese mismo día por ADR-003 (ver abajo).
 - **Alcance:** se construye por fases y cada fase es un entregable presentable. Un proyecto terminado vale más que uno enorme a medias.
 - **Título objetivo:** desarrollador backend con integración de IA (hay pocas vacantes de "AI Engineer" junior); este proyecto sirve para ambos.
+
+## Cambio de dominio (11 nov 2026)
+
+El mismo día se cambió el dominio de antifraude a una **mesa de servicio de TI para entidades financieras** con triaje asistido por IA ([ADR-003](decisiones/ADR-003-cambio-dominio-tickets.md)). Razones:
+
+- Juan Pablo trabaja en soporte de TI: conoce el flujo de tickets de primera mano y puede defender cada decisión con experiencia real.
+- El triaje con IA (clasificar, priorizar, detectar duplicados, sugerir soluciones desde una base de conocimiento) es uno de los usos empresariales de IA más comunes, así que es muy empleable.
+- El principio no cambia: **la IA recomienda y el humano decide.**
+
+Qué cambió en la arquitectura: `simulador` y `deteccion` se reemplazan por `mesa-servicio` (Java, monolito modular). El `agente` (C#) sigue como servicio aparte con RabbitMQ porque es lento, costoso y el más expuesto: el texto de los tickets lo escribe cualquier usuario. Se suma pgvector para buscar tickets y artículos similares, y el enmascarado de datos sensibles antes de llamar al LLM.
+
+Ajustes acordados al aprobar: eventos de SLA en memoria (no por el broker), dos roles de BD para que la auditoría sea realmente de solo inserción, tablero solo Kanban y proveedor de embeddings a decidir en la fase 3. Se mantuvo el nombre **Centinela**.
 
 ## Dos niveles de agentes (no confundirlos)
 
@@ -44,4 +56,4 @@ El análisis adversario aplica a los dos: un revisor atacante sobre el código q
 
 ## Próximo paso acordado
 
-Terminar la **fase 1** del roadmap (agente de consola en C# con 2 o 3 herramientas y pruebas de prompt injection), publicarla en GitHub y mandársela al profesor.
+Terminar la **fase 1** del roadmap (agente de triaje de consola en C# con 3 herramientas y pruebas de prompt injection), publicarla en GitHub y mandársela al profesor.

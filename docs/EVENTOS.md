@@ -1,11 +1,11 @@
 # Contratos de eventos
 
-Todos los eventos comparten este sobre:
+Todos los eventos de RabbitMQ comparten este sobre:
 
 ```json
 {
   "id": "uuid",
-  "tipo": "TransaccionRecibida",
+  "tipo": "TicketCreado",
   "version": 1,
   "correlationId": "uuid",
   "ocurridoEn": "2026-11-11T23:34:00Z",
@@ -13,52 +13,40 @@ Todos los eventos comparten este sobre:
 }
 ```
 
-Reglas: montos como texto decimal más moneda; fechas ISO-8601 en UTC; un cambio incompatible sube `version` y el consumidor acepta ambas durante la transición.
+Reglas: fechas ISO-8601 en UTC; montos, si aparecen, como texto decimal más moneda; un cambio incompatible sube `version` y el consumidor acepta ambas durante la transición.
 
-## TransaccionRecibida (v1)
+## TicketCreado (v1)
 
-Publica `simulador` → consume `deteccion`.
+Publica `mesa-servicio` (vía outbox) → consume `agente`.
 
 ```json
 {
-  "transaccionId": "uuid",
-  "clienteId": "uuid",
-  "monto": "1250.00",
-  "moneda": "CRC",
-  "comercio": "texto libre (NO CONFIABLE)",
-  "categoriaComercio": "string",
-  "pais": "CR",
-  "canal": "tarjeta | transferencia | sinpe_movil",
-  "fecha": "2026-11-11T23:30:00Z"
+  "ticketId": "uuid",
+  "tipo": "incidente | solicitud | problema | cambio",
+  "titulo": "texto ENMASCARADO (NO CONFIABLE)",
+  "descripcion": "texto ENMASCARADO (NO CONFIABLE)",
+  "sistemaReportado": "string | null",
+  "canal": "portal | correo | telefono"
 }
 ```
 
-## CasoSospechosoCreado (v1)
+`titulo` y `descripcion` salen ya enmascarados (cédulas, cuentas, tarjetas, correos y teléfonos reemplazados por marcadores como `[CEDULA]`). El `agente` vuelve a verificarlo antes de llamar al modelo; si encuentra algo sin enmascarar, no llama al modelo y publica `estadoAnalisis = error`.
 
-Publica `deteccion` (vía outbox) → consume `agente`.
+## TicketTriado (v1)
 
-```json
-{
-  "casoId": "uuid",
-  "transaccionId": "uuid",
-  "clienteId": "uuid",
-  "puntajeReglas": 82,
-  "reglasActivadas": ["MONTO_INUSUAL", "PAIS_DISTINTO"]
-}
-```
-
-## CasoAnalizado (v1)
-
-Publica `agente` → consume `deteccion`.
+Publica `agente` → consume `mesa-servicio`.
 
 ```json
 {
-  "casoId": "uuid",
+  "ticketId": "uuid",
   "estadoAnalisis": "completado | invalido | presupuesto_agotado | error",
-  "recomendacion": "revisar_urgente | revisar | probablemente_legitimo | null",
-  "nivelRiesgo": "alto | medio | bajo | null",
-  "hallazgos": ["texto corto", "..."],
-  "resumen": "explicación para el analista",
+  "categoria": "string | null",
+  "sistemaAfectado": "string | null",
+  "prioridadSugerida": "P1 | P2 | P3 | P4 | null",
+  "justificacion": "texto | null",
+  "duplicadosPosibles": ["ticketId"],
+  "articulosSugeridos": ["articuloId"],
+  "borradorRespuesta": "texto | null",
   "metricas": {
     "modelo": "string",
     "tokensEntrada": 0,
@@ -69,18 +57,29 @@ Publica `agente` → consume `deteccion`.
 }
 ```
 
-Si `estadoAnalisis` no es `completado`, `recomendacion` es `null` y el caso queda para revisión manual completa.
+Si `estadoAnalisis` no es `completado`, los campos de sugerencia van en `null` (o listas vacías) y el ticket queda para triaje manual. `mesa-servicio` nunca aplica la sugerencia sola: la guarda para que el técnico la acepte, la corrija o la descarte.
 
-`hallazgos` y `resumen` los genera el modelo: son **no confiables**. Límites, validados por el `agente` al producirlos y por `deteccion` al recibirlos:
+Los textos los genera el modelo: son **no confiables**. Límites, validados por el `agente` al producirlos y por `mesa-servicio` al recibirlos:
 
 | Campo | Límite |
 |---|---|
-| `hallazgos` | máximo 10 elementos, cada uno de hasta 300 caracteres |
-| `resumen` | hasta 2000 caracteres |
+| `justificacion` | hasta 500 caracteres |
+| `borradorRespuesta` | hasta 2000 caracteres |
+| `duplicadosPosibles` | hasta 5 IDs, que deben existir |
+| `articulosSugeridos` | hasta 5 IDs, que deben existir |
 
-Texto plano. Si no cumple, el `agente` publica `estadoAnalisis = invalido` sin recomendación. Si aun así llega a `deteccion`, el mensaje se rechaza a la DLQ.
+Texto plano. Si no cumple, el `agente` publica `estadoAnalisis = invalido`. Si aun así llega a `mesa-servicio`, el mensaje se rechaza a la DLQ.
 
-El `agente` deduplica por `casoId` además de por `id`: si un caso ya fue analizado, no vuelve a llamar al modelo y republica el resultado guardado.
+El `agente` deduplica por `ticketId` además de por `id`: si un ticket ya fue triado, no vuelve a llamar al modelo y republica el resultado guardado.
+
+## Eventos internos de `mesa-servicio` (en memoria, no van por RabbitMQ)
+
+| Evento | Publica → consume | Datos principales |
+|---|---|---|
+| `SlaPorVencer` | módulo `sla` → notificaciones | `ticketId`, `prioridad`, `porcentajeConsumido`, `venceEn` |
+| `SlaVencido` | módulo `sla` → escalamiento | `ticketId`, `prioridad`, `vencioEn` |
+
+Son eventos de aplicación de Spring. Si algún día los consume otro servicio, pasan al broker con el sobre de arriba y se documentan como contrato.
 
 ## Colas
 
@@ -88,7 +87,6 @@ Todo vive en el vhost `centinela` de RabbitMQ.
 
 | Exchange / cola | Uso |
 |---|---|
-| `transacciones` → `deteccion.transacciones` | Ingesta |
-| `casos` → `agente.casos-sospechosos` | Trabajo para el agente |
-| `analisis` → `deteccion.casos-analizados` | Resultados del agente |
+| `tickets` → `agente.tickets-creados` | Trabajo para el agente |
+| `triajes` → `mesa-servicio.tickets-triados` | Resultados del agente |
 | `*.dlq` | Mensajes muertos de cada cola |

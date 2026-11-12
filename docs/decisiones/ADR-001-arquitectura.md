@@ -1,6 +1,6 @@
 # ADR-001 — Arquitectura del sistema
 
-- **Estado:** Aceptado (aprobado por Juan Pablo el 2026-11-11)
+- **Estado:** Reemplazado por [ADR-003](ADR-003-cambio-dominio-tickets.md) el 2026-11-11. Se conserva como historia: el dominio antifraude ya no se construye.
 - **Fecha:** 2026-11-11
 
 ## Contexto
