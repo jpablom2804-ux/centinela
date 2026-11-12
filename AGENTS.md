@@ -29,7 +29,7 @@ La base es el skill `buenas-practicas-java-react`. En Claude Code se usa la vers
 | Autenticación | OIDC con Keycloak (fase 4) y BFF: `mesa-servicio` es el cliente OIDC y el navegador solo tiene una cookie de sesión — ADR-004. Roles: `solicitante`, `tecnico`, `coordinador`, `aprobador_cambios`, `auditor`. Sin login hecho a mano |
 | Maneja dinero | No directamente. Si aparecen montos (por ejemplo, el costo de un cambio o del agente), aplican las reglas de dinero del skill |
 | Usuarios | Empleados que reportan, técnicos de soporte, coordinadores, comité de cambios, auditoría (simulados) |
-| Integraciones | API de LLM (Anthropic), proveedor de embeddings (a decidir en la fase 3), RabbitMQ, Power BI (solo lectura) |
+| Integraciones | API de LLM configurable: Anthropic o compatible con OpenAI (Qwen para desarrollo) — ADR-006; proveedor de embeddings (a decidir en la fase 3), RabbitMQ, Power BI (solo lectura) |
 
 ## Arquitectura (resumen de ADR-003)
 

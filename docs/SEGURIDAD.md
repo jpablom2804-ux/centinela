@@ -27,6 +27,8 @@ Verificar siempre la numeración y el texto oficiales en owasp.org y genai.owasp
 | Consumo sin límite | Un ticket provoca un ciclo largo o muy caro, o llega una avalancha de tickets | Máximo de iteraciones, tiempo y tokens por ticket (fase 1). Tope diario de tokens en `agente` y deduplicación por `ticketId` (fase 3). Alerta de costo diario en dinero desde `reportes` (fase 7) |
 | Envenenamiento de la base de conocimiento | Un artículo con instrucciones maliciosas termina en las sugerencias | Los artículos se tratan como datos no confiables; los artículos nuevos los publica un humano |
 | Envenenamiento de memoria | Si en el futuro el agente guarda memoria entre tickets | Hoy no hay memoria entre tickets. Agregarla requiere un ADR |
+| Proveedor gratuito que guarda o entrena con los prompts | Qwen gratis en la nube (ADR-006) | Datos 100 % sintéticos y enmascarado verificado antes de cada llamada, con cualquier proveedor. La key solo viaja por https (http solo a localhost) |
+| Modelo más débil ante la inyección de instrucciones | Modelos chicos o gratuitos | La validación de la salida no cambia con el proveedor; la suite adversaria se corre con el modelo que se muestra y el resultado se reporta con su nombre |
 | Cadena de suministro | Paquetes NuGet, Maven o npm vulnerables | Revisión de vulnerabilidades en cada fase |
 
 ## Riesgos del dominio y controles

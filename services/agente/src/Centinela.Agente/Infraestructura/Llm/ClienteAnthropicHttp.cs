@@ -45,7 +45,7 @@ public sealed class ClienteAnthropicHttp(HttpClient http, IOptions<OpcionesLlm> 
         using (respuesta)
         {
             var cuerpo = await respuesta.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            if (!respuesta.IsSuccessStatusCode) throw Clasificar(respuesta, cuerpo);
+            if (!respuesta.IsSuccessStatusCode) throw ClasificadorErroresHttp.Clasificar(respuesta, cuerpo);
             return Interpretar(cuerpo);
         }
     }
@@ -145,47 +145,6 @@ public sealed class ClienteAnthropicHttp(HttpClient http, IOptions<OpcionesLlm> 
             (string?)raiz["model"] ?? "desconocido",
             contenido.DeepClone(),
             (string?)raiz["stop_details"]?["category"]);
-    }
-
-    public static ErrorLlmException Clasificar(HttpResponseMessage respuesta, string cuerpo)
-    {
-        ArgumentNullException.ThrowIfNull(respuesta);
-        var codigo = (int)respuesta.StatusCode;
-        var (tipoApi, mensajeApi) = LeerError(cuerpo);
-        var espera = respuesta.Headers.RetryAfter?.Delta;
-
-        // El saldo agotado llega como 402 billing_error, o en algunas cuentas como 400 con ese mensaje.
-        var sinSaldo = codigo == 402 || tipoApi == "billing_error"
-            || (codigo == 400 && mensajeApi.Contains("credit balance", StringComparison.OrdinalIgnoreCase));
-
-        var (tipo, reintentable) = sinSaldo
-            ? (TipoErrorLlm.SaldoInsuficiente, false)
-            : respuesta.StatusCode switch
-            {
-                HttpStatusCode.Unauthorized => (TipoErrorLlm.Autenticacion, false),
-                HttpStatusCode.Forbidden => (TipoErrorLlm.Permiso, false),
-                HttpStatusCode.TooManyRequests => (TipoErrorLlm.LimiteTasa, true),
-                HttpStatusCode.RequestTimeout => (TipoErrorLlm.Timeout, true),
-                HttpStatusCode.Conflict => (TipoErrorLlm.ErrorServidor, true),
-                _ when codigo == 529 => (TipoErrorLlm.Saturado, true),
-                _ when codigo >= 500 => (TipoErrorLlm.ErrorServidor, true),
-                _ => (TipoErrorLlm.SolicitudInvalida, false),
-            };
-
-        return new ErrorLlmException(tipo, reintentable, codigo, espera);
-    }
-
-    private static (string Tipo, string Mensaje) LeerError(string cuerpo)
-    {
-        try
-        {
-            var error = JsonNode.Parse(cuerpo)?["error"];
-            return ((string?)error?["type"] ?? string.Empty, (string?)error?["message"] ?? string.Empty);
-        }
-        catch (JsonException)
-        {
-            return (string.Empty, string.Empty);
-        }
     }
 
     private static int Entero(JsonNode? nodo, string nombre) => nodo?[nombre] is JsonValue v && v.TryGetValue<int>(out var n) ? n : 0;

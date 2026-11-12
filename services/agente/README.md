@@ -24,7 +24,7 @@ Requisitos: SDK de .NET 10 (`global.json` lo fija).
 
 ```bash
 cd services/agente
-dotnet test                                                      # 62 pruebas: 60 sin gastar tokens, 2 con el modelo real (saltadas)
+dotnet test                                                      # 82 pruebas: 80 sin gastar tokens, 2 con el modelo real (saltadas)
 
 # Primera vez: la API key va como secreto, fuera del repo (ADR-005)
 dotnet user-secrets set "Llm:ApiKey" "<tu key>" --project src/Centinela.Agente
@@ -34,12 +34,33 @@ dotnet run --project src/Centinela.Agente -- ejemplos/ticket.json
 
 El resultado sale por stdout. Los logs, en JSON y solo con IDs y métricas, salen por stderr.
 
+### Usar Qwen en vez de Claude (gratis o casi, ADR-006)
+
+El agente habla con dos formatos: la API de Anthropic y la de OpenAI (Chat Completions), que es la que usan Qwen y Ollama. Se elige por configuración, sin tocar código. Estos valores quedan en tu máquina, fuera del repo:
+
+```bash
+P=src/Centinela.Agente
+dotnet user-secrets set "Llm:Proveedor" "openai_compatible" --project $P
+dotnet user-secrets set "Llm:UrlBase"   "<URL de la tabla>" --project $P
+dotnet user-secrets set "Llm:Modelo"    "<modelo>"          --project $P
+dotnet user-secrets set "Llm:ApiKey"    "<tu key>"          --project $P   # no hace falta con Ollama local
+```
+
+| Dónde corre Qwen | `Llm:UrlBase` | Ejemplo de `Llm:Modelo` |
+|---|---|---|
+| Alibaba Cloud Model Studio (internacional) | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1/` | `qwen-plus` |
+| OpenRouter | `https://openrouter.ai/api/v1/` | un modelo Qwen con sufijo `:free` |
+| Ollama en tu PC (sin key ni internet) | `http://localhost:11434/v1/` | `qwen3:4b` |
+
+Los nombres de modelos y las cuotas gratuitas cambian seguido: hay que confirmarlos en la página de cada proveedor. Con modelos chicos o gratuitos, más tickets pueden terminar en `invalido`, y eso es lo correcto: la validación no se relaja por el proveedor.
+
 ### Configuración
 
 En `src/Centinela.Agente/appsettings.json`, y se puede sobrescribir con variables de entorno (`Llm__Modelo`, `Agente__MaxIteraciones`, ...):
 
 | Clave | Por defecto | Para qué |
 |---|---|---|
+| `Llm:Proveedor` | `anthropic` | `anthropic` u `openai_compatible` (Qwen, Ollama, OpenRouter…) |
 | `Llm:Modelo` | `claude-opus-5-5` | Modelo. `claude-haiku-5-5` cuesta unas 40 veces menos: medirlo con la suite antes de cambiar |
 | `Llm:Esfuerzo` | `medium` | Profundidad del razonamiento (`low` … `max`) |
 | `Llm:UsarFallbackServidor` | `true` | Si el modelo rechaza por sus filtros, la API reintenta en otro modelo |

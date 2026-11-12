@@ -23,8 +23,9 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [x] Registro de tokens, iteraciones y duración
 - [x] Tests unitarios del ciclo con un `IClienteLlm` falso (sin gastar tokens)
 - [x] Primeros 5 casos adversarios (`docs/SEGURIDAD.md`) pasando con el modelo falso
+- [x] Proveedor configurable: Anthropic o compatible con OpenAI, para usar Qwen gratis en desarrollo (ADR-006)
 - [ ] Casos 1 y 2 de la suite adversaria contra el modelo real (necesita API key)
-- [ ] Primera corrida real: `dotnet run -- ejemplos/ticket.json` (necesita API key)
+- [ ] Primera corrida real: `dotnet run -- ejemplos/ticket.json` con Qwen (necesita API key o Ollama)
 - [x] README de la fase con un ejemplo de entrada y salida, y qué se aprendió
 
 **Hecho cuando:** `dotnet run -- ticket.json` devuelve un triaje válido, los tests pasan y la suite adversaria básica está en verde.

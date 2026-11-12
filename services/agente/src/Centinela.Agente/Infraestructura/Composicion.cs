@@ -21,10 +21,16 @@ public static class Composicion
         servicios.AddOptions<OpcionesLlm>()
             .Bind(configuracion.GetSection(OpcionesLlm.Seccion))
             .ValidateDataAnnotations()
-            .Validate(o => OpcionesLlm.EsfuerzosValidos.Contains(o.Esfuerzo), "Llm:Esfuerzo debe ser low, medium, high, xhigh o max.")
             .ValidateOnStart();
+        servicios.AddSingleton<IValidateOptions<OpcionesLlm>, ValidadorOpcionesLlm>();
 
-        servicios.AddHttpClient<IClienteLlm, ClienteAnthropicHttp>();
+        // Dos adaptadores reales del mismo puerto (ADR-006); el proveedor se elige por configuración.
+        servicios.AddHttpClient<ClienteAnthropicHttp>();
+        servicios.AddHttpClient<ClienteOpenAiCompatibleHttp>();
+        servicios.AddTransient<IClienteLlm>(sp =>
+            sp.GetRequiredService<IOptions<OpcionesLlm>>().Value.Proveedor == OpcionesLlm.ProveedorCompatibleOpenAi
+                ? sp.GetRequiredService<ClienteOpenAiCompatibleHttp>()
+                : sp.GetRequiredService<ClienteAnthropicHttp>());
         servicios.AddSingleton(TimeProvider.System);
         servicios.AddSingleton(RepositorioDatosPrueba.Cargar(rutaDatosPrueba));
         servicios.AddSingleton<IHerramienta, HerramientaBuscarTicketsSimilares>();
