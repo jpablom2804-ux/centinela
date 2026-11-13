@@ -34,10 +34,22 @@ spring:
     publisher-returns: true
     template:
       mandatory: true
+    # Consumo de TicketTriado: lo que se rechaza va a la DLQ (nunca se reencola en bucle).
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        prefetch: 10
   jackson:
     deserialization:
       # A6: un campo que la acción no acepta (por ejemplo "prioridad" al crear) es un 400, no se ignora.
       fail-on-unknown-properties: true
+
+# Logs JSON (ECS) a stdout, con el correlationId del MDC en cada línea: un ticket se sigue entre servicios.
+logging:
+  structured:
+    format:
+      console: ecs
 
 server:
   error:
@@ -74,6 +86,23 @@ centinela:
   tickets:
     # A5: tickets que una misma persona puede crear por hora (además del rate limiting por IP de nginx).
     max-por-hora: 20
+  # Cuenta de servicio del agente para la API interna de solo lectura (/interna/**).
+  api-interna:
+    usuario: agente
+    password: ${api_interna_agente_password:}
+  conocimiento:
+    url: https://api.voyageai.com/v1/embeddings
+    modelo: voyage-4
+    dimension: 1024
+    # Secreto opcional (ADR-007): sin key, la búsqueda es solo por texto.
+    api-key: ${voyage_api_key:}
+    umbral-similitud: 0.45
+    indexacion: PT5S
+    lote: 32
+    max-intentos: 20
+    max-espera: PT10M
+    pausa-tras-error-permanente: PT15M
+    timeout: PT10S
   mensajeria:
     relevo: PT2S
     lote: 50
@@ -81,6 +110,10 @@ centinela:
     max-intentos: 50
     espera-confirmacion: PT5S
     max-espera: PT5M
+    cola-triajes: mesa-servicio.tickets-triados
+    consumo:
+      max-reintentos: 3
+      backoff-base: PT1S
   usuarios-prueba:
     password: ${usuarios_prueba_password:}
     usuarios: []

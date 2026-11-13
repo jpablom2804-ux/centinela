@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -52,6 +54,12 @@ class ManejadorErrores {
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     ResponseEntity<ErrorApi> ilegible(Exception e) {
         return respuesta(HttpStatus.BAD_REQUEST, "DATOS_INVALIDOS", "El cuerpo tiene campos no permitidos o un formato inválido.");
+    }
+
+    /** Parámetros de consulta faltantes o fuera de rango (por ejemplo, un límite de 500 resultados). */
+    @ExceptionHandler({HandlerMethodValidationException.class, MissingServletRequestParameterException.class})
+    ResponseEntity<ErrorApi> parametros(Exception e) {
+        return respuesta(HttpStatus.BAD_REQUEST, "DATOS_INVALIDOS", "Faltan parámetros o están fuera de rango.");
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)

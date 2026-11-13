@@ -6,6 +6,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplicat
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -27,7 +29,40 @@ import org.springframework.security.web.SecurityFilterChain;
 @ConditionalOnWebApplication
 class ConfiguracionSeguridad {
 
+    public static final String ROL_SERVICIO_AGENTE = "SERVICIO_AGENTE";
+
+    /**
+     * API interna (/interna/**): solo lectura y solo para la cuenta de servicio del agente, con su propio almacén
+     * de usuarios. Ninguna persona entra aquí, y la cuenta del agente no sirve en /api. nginx no publica esta
+     * ruta: solo se alcanza desde la red interna. La contraseña llega como secreto (api_interna_agente_password);
+     * sin ella la API interna queda cerrada.
+     */
     @Bean
+    @Order(1)
+    SecurityFilterChain filtrosInternos(HttpSecurity http, CuentaServicioAgente cuenta, PasswordEncoder codificador) throws Exception {
+        var usuarios = cuenta.password() == null || cuenta.password().isBlank()
+                ? new InMemoryUserDetailsManager()
+                : new InMemoryUserDetailsManager(User.withUsername(cuenta.usuario())
+                        .password(codificador.encode(cuenta.password()))
+                        .roles(ROL_SERVICIO_AGENTE)
+                        .build());
+        return http
+                .securityMatcher("/interna/**")
+                .authorizeHttpRequests(a -> a
+                        .requestMatchers(HttpMethod.GET, "/interna/**").hasRole(ROL_SERVICIO_AGENTE)
+                        .anyRequest().denyAll())
+                .userDetailsService(usuarios)
+                .httpBasic(Customizer.withDefaults())
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(c -> c.disable())
+                .build();
+    }
+
+    @ConfigurationProperties("centinela.api-interna")
+    record CuentaServicioAgente(String usuario, String password) {}
+
+    @Bean
+    @Order(2)
     SecurityFilterChain filtros(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(a -> a

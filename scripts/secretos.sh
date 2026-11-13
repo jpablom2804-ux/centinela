@@ -22,6 +22,7 @@ NOMBRES=(
   rabbitmq_mesa_servicio_password
   rabbitmq_agente_password
   usuarios_prueba_password
+  api_interna_agente_password
 )
 # Secretos que no se pueden generar (los entrega un proveedor). Son opcionales: sin ellos
 # la aplicación arranca igual y usa su camino de respaldo (ADR-007).

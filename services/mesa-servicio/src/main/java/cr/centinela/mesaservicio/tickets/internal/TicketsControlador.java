@@ -21,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 class TicketsControlador {
 
     private final ServicioTickets servicio;
+    private final ServicioSugerencias sugerencias;
 
-    TicketsControlador(ServicioTickets servicio) {
+    TicketsControlador(ServicioTickets servicio, ServicioSugerencias sugerencias) {
         this.servicio = servicio;
+        this.sugerencias = sugerencias;
     }
 
     // [FLUJO CREAR_TICKET 1] Recibe el ticket del usuario autenticado y valida el cuerpo → ServicioTickets.crear (paso 2)
@@ -69,5 +71,11 @@ class TicketsControlador {
     @GetMapping("/{id}/comentarios")
     List<Dtos.ComentarioVista> comentarios(Authentication auth, @PathVariable UUID id) {
         return servicio.comentarios(UsuarioActual.de(auth), id);
+    }
+
+    /** La sugerencia del agente: solo soporte y auditoría, y nunca aplicada (la decide un técnico). */
+    @GetMapping("/{id}/sugerencia")
+    Dtos.SugerenciaVista sugerencia(Authentication auth, @PathVariable UUID id) {
+        return sugerencias.ver(UsuarioActual.de(auth), id);
     }
 }

@@ -47,6 +47,18 @@ final class Dtos {
         }
     }
 
+    /** La recomendación del agente, tal como llegó. {@code aplicada} siempre es false: la decide un técnico (fase 4). */
+    record SugerenciaVista(String estadoAnalisis, String categoria, String sistemaAfectado, String prioridadSugerida,
+            String justificacion, List<String> duplicadosPosibles, List<String> articulosSugeridos, String borradorRespuesta,
+            String modelo, Instant recibidaEn, boolean aplicada) {
+
+        static SugerenciaVista de(SugerenciaTriaje s) {
+            return new SugerenciaVista(s.estadoAnalisis(), s.categoria(), s.sistemaAfectado(), s.prioridadSugerida(),
+                    s.justificacion(), s.duplicadosPosibles(), s.articulosSugeridos(), s.borradorRespuesta(), s.modelo(),
+                    s.recibidaEn(), false);
+        }
+    }
+
     record ComentarioVista(UUID id, String autor, String texto, Instant creadoEn) {
 
         static ComentarioVista de(Comentario c) {

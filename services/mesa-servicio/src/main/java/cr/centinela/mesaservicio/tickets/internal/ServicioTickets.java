@@ -2,6 +2,8 @@ package cr.centinela.mesaservicio.tickets.internal;
 
 import cr.centinela.mesaservicio.auditoria.EventoAuditoria;
 import cr.centinela.mesaservicio.auditoria.RegistroAuditoria;
+import cr.centinela.mesaservicio.conocimiento.api.IndiceSemantico;
+import cr.centinela.mesaservicio.plataforma.Enmascarador;
 import cr.centinela.mesaservicio.plataforma.Errores;
 import cr.centinela.mesaservicio.plataforma.Rol;
 import cr.centinela.mesaservicio.plataforma.UsuarioActual;
@@ -34,9 +36,11 @@ class ServicioTickets {
     private final Clock reloj;
     private final LimitesTickets limites;
     private final PublicadorTicketCreado publicador;
+    private final IndiceSemantico indice;
 
     ServicioTickets(TicketRepositorio tickets, ComentarioRepositorio comentarios, RegistroAuditoria auditoria,
-            ApplicationEventPublisher eventos, Clock reloj, LimitesTickets limites, PublicadorTicketCreado publicador) {
+            ApplicationEventPublisher eventos, Clock reloj, LimitesTickets limites, PublicadorTicketCreado publicador,
+            IndiceSemantico indice) {
         this.tickets = tickets;
         this.comentarios = comentarios;
         this.auditoria = auditoria;
@@ -44,6 +48,7 @@ class ServicioTickets {
         this.reloj = reloj;
         this.limites = limites;
         this.publicador = publicador;
+        this.indice = indice;
     }
 
     // [FLUJO CREAR_TICKET 2] Valida el rol y el límite por usuario (A5), crea el ticket en estado nuevo → paso 3 (bitácora) y 4 (evento)
@@ -62,6 +67,9 @@ class ServicioTickets {
         eventos.publishEvent(new EventosTicket.TicketCreado(ticket.id(), ticket.prioridad(), ahora, usuario.id()));
         // [FLUJO CREAR_TICKET 6] Deja TicketCreado enmascarado en el outbox, en esta misma transacción → TRIAJE_ASINCRONO 1
         publicador.registrar(ticket);
+        // [FLUJO CREAR_TICKET 7] Lo deja pendiente de indexar (texto enmascarado); el vector se calcula aparte → IndexadorSemantico
+        indice.registrar(IndiceSemantico.TipoRecurso.TICKET, ticket.id().toString(),
+                Enmascarador.enmascarar(ticket.titulo() + ". " + ticket.descripcion()));
         return Dtos.TicketVista.de(ticket);
     }
 

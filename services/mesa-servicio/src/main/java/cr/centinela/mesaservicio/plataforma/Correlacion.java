@@ -24,7 +24,8 @@ public final class Correlacion {
         return valor != null ? valor : nuevo();
     }
 
-    static String desdeCabecera(String valor) {
+    /** El valor si tiene un formato válido; si no (o si falta), uno nuevo. */
+    public static String desdeCabecera(String valor) {
         return valor != null && VALIDO.matcher(valor).matches() ? valor : nuevo();
     }
 

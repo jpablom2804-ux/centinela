@@ -14,7 +14,10 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicReference;
+import cr.centinela.mesaservicio.conocimiento.internal.ProveedorEmbeddingsFalso;
 import org.flywaydb.core.Flyway;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -55,9 +58,24 @@ public abstract class PruebaIntegracion {
             .withCopyToContainer(Transferable.of("clave-agente-prueba"), "/run/secrets/agente_db_password")
             .withCopyToContainer(Transferable.of("clave-powerbi-prueba"), "/run/secrets/powerbi_ro_db_password");
 
+    public static final String CLAVE_API_INTERNA = "clave-api-interna-prueba";
     public static final String CLAVE_MQ_ADMIN = "clave-mq-admin-prueba";
     public static final String CLAVE_MQ_MESA = "clave-mq-mesa-prueba";
     public static final String CLAVE_MQ_AGENTE = "clave-mq-agente-prueba";
+
+    private static RabbitTemplate rabbitAdmin;
+
+    /** Para que las pruebas publiquen o lean colas como el administrador del broker (no como la app). */
+    protected static synchronized RabbitTemplate rabbitComoAdmin() {
+        if (rabbitAdmin == null) {
+            var conexion = new CachingConnectionFactory(RABBIT.getHost(), RABBIT.getAmqpPort());
+            conexion.setUsername("centinela");
+            conexion.setPassword(CLAVE_MQ_ADMIN);
+            conexion.setVirtualHost("centinela");
+            rabbitAdmin = new RabbitTemplate(conexion);
+        }
+        return rabbitAdmin;
+    }
 
     /**
      * El broker real con las mismas definiciones del proyecto (A3): colas, DLQ y un usuario por servicio con
@@ -93,8 +111,13 @@ public abstract class PruebaIntegracion {
         registro.add("spring.rabbitmq.host", RABBIT::getHost);
         registro.add("spring.rabbitmq.port", RABBIT::getAmqpPort);
         registro.add("spring.rabbitmq.password", () -> CLAVE_MQ_MESA);
-        // Igual que el vigilante: el relevo del outbox se llama a mano.
+        // Igual que el vigilante: el relevo del outbox y el indexador se llaman a mano.
         registro.add("centinela.mensajeria.relevo", () -> "PT24H");
+        registro.add("centinela.conocimiento.indexacion", () -> "PT24H");
+        registro.add("centinela.api-interna.password", () -> CLAVE_API_INTERNA);
+        registro.add("centinela.mensajeria.consumo.backoff-base", () -> "PT0.01S");
+        // El proveedor falso (bolsa de palabras) da similitudes más bajas que un modelo real.
+        registro.add("centinela.conocimiento.umbral-similitud", () -> "0.1");
     }
 
     /** La plantilla del proyecto con los hashes de las claves de prueba, como hace scripts/secretos.sh. */
@@ -134,6 +157,13 @@ public abstract class PruebaIntegracion {
         @Primary
         RelojMovible relojMovible() {
             return new RelojMovible(Instant.parse("2026-11-09T15:00:00Z")); // lunes 09:00 en Costa Rica
+        }
+
+        /** Nunca se llama a Voyage en las pruebas; las que necesitan vectores lo habilitan. */
+        @Bean
+        @Primary
+        ProveedorEmbeddingsFalso proveedorEmbeddingsFalso() {
+            return new ProveedorEmbeddingsFalso();
         }
     }
 

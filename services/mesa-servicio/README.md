@@ -1,12 +1,13 @@
 # mesa-servicio
 
-Núcleo de la mesa de servicio, en Java 25 y Spring Boot 4: tickets, SLA y auditoría por ahora. Más adelante se suman tablero, cambios, conocimiento y reportes. Es un monolito modular (ADR-003): cada módulo expone solo su paquete `api/`, y `ModulosTest` (Spring Modulith) hace fallar el build si alguno usa el `internal/` de otro.
+Núcleo de la mesa de servicio, en Java 25 y Spring Boot 4: tickets, SLA, conocimiento y auditoría por ahora. Más adelante se suman tablero, cambios y reportes. Es un monolito modular (ADR-003): cada módulo expone solo su paquete `api/`, y `ModulosTest` (Spring Modulith) hace fallar el build si alguno usa el `internal/` de otro.
 
 | Módulo | Qué hace hoy |
 |---|---|
 | `tickets` | Crear, listar, ver, asignar, cambiar estado y prioridad, comentar. Transiciones válidas; un ticket cerrado solo se reabre con justificación |
 | `sla` | Reloj de resolución por ticket en tiempo hábil (jornada, fines de semana y feriados en hora de Costa Rica). Se pausa en `en_espera`. Avisos en memoria al 75 % y al vencer, con ShedLock para varias réplicas |
 | `auditoria` | Bitácora de solo inserción, encadenada con hash: un registro alterado o insertado a mano se detecta |
+| `conocimiento` | Artículos de solución y búsqueda por significado (ADR-007): embeddings de Voyage AI en pgvector, calculados aparte en lotes. Sin key de Voyage, o si Voyage falla, busca por texto (PostgreSQL en español) |
 | `plataforma` | Seguridad, usuario actual, errores `{ codigo, mensaje }`, ID de correlación, enmascarado de datos sensibles y outbox hacia RabbitMQ |
 
 ## Seguridad que ya está en el código
@@ -21,7 +22,7 @@ Núcleo de la mesa de servicio, en Java 25 y Spring Boot 4: tickets, SLA y audit
 
 ## Cómo correrlo
 
-Requisitos: JDK 25, Docker y el compose de la raíz levantado (`docker compose up -d` y `./scripts/secretos.sh generar`).
+Requisitos: JDK 25, Docker y el compose de la raíz levantado (`docker compose up -d` y `./scripts/secretos.sh generar`). La key de Voyage AI es opcional (`./scripts/secretos.sh guardar voyage_api_key`): sin ella, la búsqueda es por texto.
 
 ```bash
 cd services/mesa-servicio
@@ -52,6 +53,9 @@ curl -u "solicitante1:$P" -H "Content-Type: application/json" \
 | `POST /api/tickets/{id}/prioridad` | técnico o coordinador, con justificación |
 | `POST /api/tickets/{id}/asignacion` | el coordinador asigna a cualquiera; un técnico solo se lo toma a sí mismo |
 | `POST/GET /api/tickets/{id}/comentarios` | el solicitante en los suyos y soporte; nunca en un ticket cerrado |
+| `GET /api/tickets/{id}/sugerencia` | soporte y auditoría: la sugerencia del agente, siempre con `aplicada: false` |
+
+La API interna de solo lectura (`/interna/tickets/{id}/similares`, `/interna/articulos`, `/interna/sistemas/{sistema}/incidentes`) es solo para las herramientas del agente: acepta únicamente su cuenta de servicio (`secrets/api_interna_agente_password`), solo `GET`, y todo lo que devuelve va enmascarado. Fuera de desarrollo, nginx no la publica.
 
 ## Pruebas
 
@@ -59,7 +63,7 @@ curl -u "solicitante1:$P" -H "Content-Type: application/json" \
 ./mvnw -B verify
 ```
 
-Son 64 pruebas, entre ellas:
+Son 78 pruebas, entre ellas:
 - **Unitarias:** transiciones, calendario laboral (fines de semana, feriados y cambio de día en UTC) y enmascarado (el contrato compartido con el agente más evasiones como ancho completo, caracteres invisibles o dígitos de otros alfabetos).
 - **Límites entre módulos:** la verificación de Spring Modulith.
-- **Integración con PostgreSQL y RabbitMQ reales (Testcontainers):** usa el mismo script de init del proyecto, Flyway corre con el rol dueño y la app con el suyo. Cubren la API, la bitácora, el vigilante de SLA (con un reloj que se puede mover) y el outbox: mensaje enmascarado, `correlationId` de punta a punta y reintento cuando no hay cola.
+- **Integración con PostgreSQL y RabbitMQ reales (Testcontainers):** usa el mismo script de init del proyecto, Flyway corre con el rol dueño y la app con el suyo. Cubren la API, la bitácora, el vigilante de SLA (con un reloj que se puede mover), el outbox (mensaje enmascarado, `correlationId` de punta a punta, reintento cuando no hay cola), el consumo de `TicketTriado` (guardado sin aplicarse, duplicados, DLQ, A3), la API interna y la búsqueda por texto y por significado. Esta última usa un proveedor de embeddings falso: el CI nunca llama a Voyage.
