@@ -39,7 +39,8 @@ Servicio `mesa-servicio`, rutas bajo `services/mesa-servicio/src/main/java/cr/ce
 | 3 | `tickets/internal/ServicioTickets.java` | `crear` → `auditoria/RegistroAuditoria.registrar` | Registra la creación en la bitácora de solo inserción, encadenada con hash, en la misma transacción |
 | 4 | `tickets/internal/ServicioTickets.java` | `crear` | Publica `TicketCreado` en memoria |
 | 5 | `sla/internal/ServicioSla.java` | `alCrearTicket` | Arranca el reloj de resolución |
-| 6 | `tickets/internal/ServicioTickets.java` | `crear` → `PublicadorTicketCreado.registrar` | Deja `TicketCreado` en el outbox, en la misma transacción (sigue en `TRIAJE_ASINCRONO` 1); el controlador responde `201` |
+| 6 | `tickets/internal/ServicioTickets.java` | `crear` → `PublicadorTicketCreado.registrar` | Deja `TicketCreado` en el outbox, en la misma transacción (sigue en `TRIAJE_ASINCRONO` 1) |
+| 7 | `tickets/internal/ServicioTickets.java` → `conocimiento/internal/IndiceSemanticoPostgres.java` | `crear` → `registrar` | Deja el ticket pendiente de indexar (texto enmascarado); `IndexadorSemantico` calcula el vector después, en lotes y con SKIP LOCKED. El controlador responde `201` |
 
 ## TRIAJE_ASINCRONO
 
@@ -52,9 +53,23 @@ Empieza en `mesa-servicio` (rutas bajo `services/mesa-servicio/src/main/java/cr/
 | 3 | `plataforma/mensajeria/RelevoOutbox.java` | `publicarPendientes` | Cada 2 s toma un lote con `FOR UPDATE SKIP LOCKED` (varias réplicas sin pisarse), publica en el exchange `tickets` y marca publicado solo con el ack del broker y si llegó a una cola; si no, reintenta con backoff hasta un máximo |
 | 4 | `agente`: `Infraestructura/Mensajeria/ConsumidorTicketsCreados.cs` | `AtenderAsync` | Recibe de `agente.tickets-creados` (prefetch 1, ack manual) y valida el sobre v1; lo que no cumple va a la DLQ sin llamar al modelo. Al arrancar, `Program` migra el esquema propio antes de consumir |
 | 5 | `agente`: `Aplicacion/ProcesadorTicketCreado.cs` | `ProcesarAsync` | Toma el ticket en exclusiva (advisory lock de PostgreSQL) y descarta el mensaje ya procesado (`id`) |
-| 6 | `agente`: `Aplicacion/ProcesadorTicketCreado.cs` → `CicloAgente.TriarAsync` | `ProcesarAsync` | Si el ticket no estaba triado, corre el ciclo (`TRIAJE_AGENTE` 2–8) y guarda el resultado antes de publicar |
+| 6 | `agente`: `Aplicacion/ProcesadorTicketCreado.cs` → `CicloAgente.TriarAsync` | `ProcesarAsync` | Si el ticket no estaba triado: con el tope diario de tokens alcanzado, `presupuesto_agotado` sin llamar al modelo; si no, corre el ciclo (`TRIAJE_AGENTE` 2–8, herramientas en `HERRAMIENTAS_AGENTE`). Guarda el resultado antes de publicar |
 | 7 | `agente`: `Aplicacion/ProcesadorTicketCreado.cs` → `Infraestructura/Mensajeria/PublicadorTriajesRabbit.cs` | `ProcesarAsync` → `PublicarAsync` | Publica `TicketTriado` en `triajes` con confirmación y mandatory (si ya estaba triado, republica el mismo evento), registra el mensaje y recién ahí hace ack |
-| 8… | `mesa-servicio` | — | Fase 3, siguiente punto: consumir `mesa-servicio.tickets-triados` y guardar la sugerencia sin aplicarla |
+| 8 | `mesa-servicio`: `tickets/internal/ConsumidorTicketsTriados.java` | `recibir` | Recibe de `mesa-servicio.tickets-triados` con el `correlationId` en el MDC; JSON fuera del contrato a la DLQ; fallas transitorias de la base con backoff y máximo |
+| 9 | `mesa-servicio`: `tickets/internal/ServicioSugerencias.java` | `registrar` | Valida el contrato y que los IDs sugeridos existan (si no, DLQ); descarta si el ticket no existe, ya tiene sugerencia o ya no está en `nuevo` (A3); guarda la sugerencia **sin aplicarla** y la registra en la bitácora. Se consulta en `GET /api/tickets/{id}/sugerencia` (solo soporte y auditoría) |
+
+## HERRAMIENTAS_AGENTE
+
+Única llamada síncrona entre servicios (ADR-003): las herramientas del agente consultan la API interna de solo lectura de `mesa-servicio`, que nginx no publica y solo acepta la cuenta de servicio del agente.
+
+| Paso | Archivo | Método | Qué hace |
+|---|---|---|---|
+| 1 | `agente`: `Infraestructura/ApiInterna/ClienteApiInterna.cs` | `BuscarTicketsSimilaresAsync` / `BuscarArticulosAsync` / `IncidentesAbiertosAsync` | `GET` con la cuenta de servicio y timeout corto; cualquier falla es "no disponible" y el triaje sigue sin ese dato |
+| 2a | `mesa-servicio`: `tickets/internal/ApiInternaTickets.java` | `similares` | Busca en el índice (sin el ticket en curso, que pone el ciclo y nunca el modelo) y devuelve título, estado, sistema y la solución de los resueltos, enmascarados |
+| 2b | `mesa-servicio`: `conocimiento/internal/ApiInternaConocimiento.java` | `buscar` | Artículos por significado (Voyage + pgvector) o, si no hay embeddings, por texto; enmascarados |
+| 2c | `mesa-servicio`: `tickets/internal/ApiInternaTickets.java` | `incidentes` | Incidentes abiertos del sistema, enmascarados |
+
+El resultado vuelve al ciclo (`TRIAJE_AGENTE` 6b), que verifica otra vez el enmascarado y lo entrega al modelo como dato no confiable.
 
 ## CAMBIAR_ESTADO
 

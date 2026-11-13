@@ -51,15 +51,17 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 - [x] Enmascarado en `mesa-servicio` y outbox para publicar `TicketCreado` (contrato de enmascarado compartido con el agente en `tests/contratos/`)
 - [x] El agente pasa de consola a worker que consume la cola (sigue aceptando un ticket desde un archivo para probar el modelo)
 - [x] Un usuario de RabbitMQ por servicio con permisos mínimos; colas quorum, DLQ y enlaces declarados en `deploy/rabbitmq` (A3)
-- [ ] API interna de solo lectura de `mesa-servicio` para las herramientas, siempre enmascarada
-- [ ] Módulo `conocimiento` con pgvector y embeddings; herramientas con búsqueda por significado
-- [ ] `TicketTriado` guardado en `mesa-servicio`, sin aplicarse solo
-- [ ] Idempotencia, reintentos con backoff y DLQ en todos los consumidores; en el agente, deduplicación también por `ticketId` (listo en el agente; falta el consumidor de `mesa-servicio`)
-- [ ] Tope diario de tokens en el agente (al alcanzarlo, triaje manual sin llamar al modelo)
-- [ ] `correlationId` de punta a punta en logs JSON (viaja de la petición al agente y queda en sus logs JSON; faltan los logs JSON de `mesa-servicio`)
+- [x] API interna de solo lectura de `mesa-servicio` para las herramientas, siempre enmascarada (`/interna/**`, solo la cuenta de servicio del agente, solo GET)
+- [x] Módulo `conocimiento` con pgvector y embeddings de Voyage AI; herramientas con búsqueda por significado y respaldo por texto
+- [x] `TicketTriado` guardado en `mesa-servicio`, sin aplicarse solo (solo si el ticket sigue en `nuevo`: A3)
+- [x] Idempotencia, reintentos con backoff y DLQ en todos los consumidores; en el agente, deduplicación también por `ticketId`
+- [x] Tope diario de tokens en el agente (al alcanzarlo, triaje manual sin llamar al modelo)
+- [x] `correlationId` de punta a punta en logs JSON (ECS en `mesa-servicio`, JSON con scopes en el agente)
 - [x] Testcontainers para la integración con Postgres y RabbitMQ (en los dos servicios, con el mismo init de la base y las mismas definiciones del broker)
 
 **Hecho cuando:** se puede seguir un ticket por su `correlationId` desde su creación hasta el triaje, y tumbar el agente a mitad no pierde tickets.
+
+**Cerrada el 2026-11-12:** probada de punta a punta con Qwen y Voyage reales: un ticket con cédula y teléfono sale enmascarado, el agente lo tría con las herramientas sobre datos reales (artículos encontrados por significado) y la sugerencia queda guardada sin aplicarse, con el mismo `correlationId` en los logs de los dos servicios. Una prueba apaga el agente a mitad de un triaje y verifica que otro lo termina.
 
 ## Fase 4 — Frontend
 - [ ] Habilitar el plugin ui-ux-pro-max (`/plugin`)

@@ -4,7 +4,7 @@ Mesa de servicio de TI para entidades financieras, con triaje asistido por IA. P
 
 Cuando alguien reporta un ticket, un agente de IA programado desde cero lo analiza con herramientas de solo lectura: sugiere categoría, sistema afectado y prioridad, busca duplicados y artículos de la base de conocimiento, y redacta un borrador de respuesta. **El agente recomienda; el técnico decide.** Ninguna sugerencia se aplica sola.
 
-> **En construcción.** Listo: el agente de triaje en C# (fase 1, probado con Qwen), el núcleo de `mesa-servicio` en Java (fase 2: tickets, SLA y bitácora) y un generador de tickets sintéticos. Avance en [docs/ROADMAP.md](docs/ROADMAP.md).
+> **En construcción.** Listo: el agente de triaje en C# (fase 1), el núcleo de `mesa-servicio` en Java (fase 2: tickets, SLA y bitácora), la conexión entre los dos por RabbitMQ con búsqueda por significado (fase 3: Voyage AI y pgvector) y un generador de tickets sintéticos. Probado de punta a punta con Qwen. Avance en [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Cómo funciona
 

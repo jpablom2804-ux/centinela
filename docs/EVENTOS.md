@@ -74,7 +74,12 @@ Los textos los genera el modelo: son **no confiables**. Límites, validados por 
 
 Texto plano. Si no cumple, el `agente` publica `estadoAnalisis = invalido`. Si aun así llega a `mesa-servicio`, el mensaje se rechaza a la DLQ.
 
-El `agente` deduplica por `ticketId` además de por `id`: si un ticket ya fue triado, no vuelve a llamar al modelo y republica el resultado guardado.
+El `agente` deduplica por `ticketId` además de por `id`: si un ticket ya fue triado, no vuelve a llamar al modelo y republica el resultado guardado, con el mismo `id`.
+
+Al recibirlo, `mesa-servicio`:
+- **Rechaza a la DLQ** lo que no cumple el contrato. Eso incluye campos de más, `categoria` o `sistemaAfectado` que no sean códigos `[a-z_]`, IDs de duplicados que no son tickets existentes, artículos que no existen, y un triaje sin completar que trae sugerencia.
+- **Descarta sin DLQ, y lo registra,** el mensaje de un ticket que no existe, que ya tiene sugerencia (idempotencia) o que ya no está en `nuevo`: un resultado tardío o falso no pisa el trabajo de una persona.
+- **Guarda la sugerencia sin aplicarla.** Solo soporte y auditoría la ven, en `GET /api/tickets/{id}/sugerencia` (`aplicada: false`).
 
 ## Eventos internos de `mesa-servicio` (en memoria, no van por RabbitMQ)
 

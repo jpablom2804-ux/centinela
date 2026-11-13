@@ -120,7 +120,29 @@ A3 queda cubierto:
 - Ya no hay `guest`. El administrador queda solo para operar.
 - Las contraseñas van como hashes SHA-256 con sal, generados por `secretos.sh`.
 - Una prueba de `mesa-servicio` contra RabbitMQ real comprueba que con su usuario no puede leer la cola del agente, declarar ni vaciar colas, ni publicar en `triajes`.
-- Falta la otra mitad, para cuando exista el consumidor: que `mesa-servicio` acepte un `TicketTriado` solo si el ticket existe y sigue en `nuevo`.
+- La otra mitad también está hecha. `mesa-servicio` guarda un `TicketTriado` solo si se cumplen tres condiciones:
+  - el ticket existe;
+  - todavía no tiene sugerencia;
+  - sigue en `nuevo`.
+
+  Si el ticket ya lo trabajó una persona, el mensaje se descarta. Los IDs de duplicados y artículos tienen que existir; si no, el mensaje va a la DLQ. La sugerencia nunca se aplica sola: ni la prioridad, ni el estado, ni la asignación.
+
+**API interna** (`/interna/**`, la única llamada síncrona entre servicios):
+- Tiene su propia cadena de seguridad, solo acepta `GET` y solo acepta la cuenta de servicio del agente. La contraseña es un secreto en archivo (`api_interna_agente_password`); sin ese secreto, la API queda cerrada.
+- Una persona no entra a `/interna`, y la cuenta del agente no sirve en `/api`.
+- Todo lo que devuelve va enmascarado.
+- El ticket en curso lo pone el ciclo, nunca el modelo.
+- nginx no publica esta ruta (fase 6).
+
+**Embeddings (ADR-007):**
+- El índice guarda solo texto enmascarado.
+- Las consultas se enmascaran antes de vectorizarlas.
+- `ClienteEmbeddingsVoyage` verifica otra vez antes de cada llamada: si detecta algo, no llama.
+- Ante una key inválida o falta de saldo, deja de llamar durante 15 minutos y alerta. Mientras tanto se busca por texto.
+
+**Ajuste a la segunda barrera:** la prueba real mostró un falso positivo. Los timestamps con microsegundos (`16.989186`) y los UUID tienen tramos de dígitos que el verificador del agente leía como teléfonos o cédulas, y descartaba resultados válidos. Ahora se exceptúa solo el valor de un campo de ID o de fecha que tenga *exactamente* ese formato. Cualquier otro texto se revisa igual, y las pruebas cubren los dos casos.
+
+**Pendiente de A18:** la pausa global del worker tras N errores seguidos de saldo o de key.
 
 ## Suite adversaria (`tests/adversarial/`)
 
