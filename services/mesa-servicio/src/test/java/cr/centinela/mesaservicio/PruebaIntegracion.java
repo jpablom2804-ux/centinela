@@ -1,7 +1,15 @@
 package cr.centinela.mesaservicio;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Clock;
+import java.util.Base64;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -47,8 +55,19 @@ public abstract class PruebaIntegracion {
             .withCopyToContainer(Transferable.of("clave-agente-prueba"), "/run/secrets/agente_db_password")
             .withCopyToContainer(Transferable.of("clave-powerbi-prueba"), "/run/secrets/powerbi_ro_db_password");
 
-    /** El broker real: el relevo del outbox necesita confirmaciones y mensajes devueltos de verdad. */
-    protected static final RabbitMQContainer RABBIT = new RabbitMQContainer(DockerImageName.parse("docker.io/library/rabbitmq:4-management").asCompatibleSubstituteFor("rabbitmq"));
+    public static final String CLAVE_MQ_ADMIN = "clave-mq-admin-prueba";
+    public static final String CLAVE_MQ_MESA = "clave-mq-mesa-prueba";
+    public static final String CLAVE_MQ_AGENTE = "clave-mq-agente-prueba";
+
+    /**
+     * El broker real con las mismas definiciones del proyecto (A3): colas, DLQ y un usuario por servicio con
+     * permisos mínimos. La app se conecta como mesa_servicio, igual que fuera de las pruebas.
+     */
+    protected static final RabbitMQContainer RABBIT = new RabbitMQContainer(
+                    DockerImageName.parse("docker.io/library/rabbitmq:4-management").asCompatibleSubstituteFor("rabbitmq"))
+            .withCopyToContainer(Transferable.of(definicionesRabbit()), "/etc/rabbitmq/definiciones.json")
+            .withCopyFileToContainer(MountableFile.forHostPath(Path.of("../../deploy/rabbitmq/20-centinela.conf")),
+                    "/etc/rabbitmq/conf.d/20-centinela.conf");
 
     static {
         RABBIT.start();
@@ -73,11 +92,38 @@ public abstract class PruebaIntegracion {
         registro.add("centinela.sla.revision", () -> "PT24H");
         registro.add("spring.rabbitmq.host", RABBIT::getHost);
         registro.add("spring.rabbitmq.port", RABBIT::getAmqpPort);
-        registro.add("spring.rabbitmq.username", RABBIT::getAdminUsername);
-        registro.add("spring.rabbitmq.password", RABBIT::getAdminPassword);
-        registro.add("spring.rabbitmq.virtual-host", () -> "/");
+        registro.add("spring.rabbitmq.password", () -> CLAVE_MQ_MESA);
         // Igual que el vigilante: el relevo del outbox se llama a mano.
         registro.add("centinela.mensajeria.relevo", () -> "PT24H");
+    }
+
+    /** La plantilla del proyecto con los hashes de las claves de prueba, como hace scripts/secretos.sh. */
+    private static String definicionesRabbit() {
+        try {
+            return Files.readString(Path.of("../../deploy/rabbitmq/definiciones.plantilla.json"))
+                    .replace("__HASH_ADMIN__", hashRabbit(CLAVE_MQ_ADMIN))
+                    .replace("__HASH_MESA_SERVICIO__", hashRabbit(CLAVE_MQ_MESA))
+                    .replace("__HASH_AGENTE__", hashRabbit(CLAVE_MQ_AGENTE));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** rabbit_password_hashing_sha256: base64(sal de 4 bytes + SHA-256(sal + clave)). */
+    private static String hashRabbit(String clave) {
+        try {
+            var sal = new byte[4];
+            new SecureRandom().nextBytes(sal);
+            var sha = MessageDigest.getInstance("SHA-256");
+            sha.update(sal);
+            var resumen = sha.digest(clave.getBytes(StandardCharsets.UTF_8));
+            var todo = new byte[sal.length + resumen.length];
+            System.arraycopy(sal, 0, todo, 0, sal.length);
+            System.arraycopy(resumen, 0, todo, sal.length, resumen.length);
+            return Base64.getEncoder().encodeToString(todo);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** Reloj que las pruebas pueden mover, para probar el SLA sin esperar horas. */

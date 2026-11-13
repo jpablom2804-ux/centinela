@@ -19,6 +19,8 @@ NOMBRES=(
   agente_db_password
   powerbi_ro_db_password
   rabbitmq_password
+  rabbitmq_mesa_servicio_password
+  rabbitmq_agente_password
   usuarios_prueba_password
 )
 # Secretos que no se pueden generar (los entrega un proveedor). Son opcionales: sin ellos
@@ -26,7 +28,7 @@ NOMBRES=(
 EXTERNOS=(
   voyage_api_key
 )
-RABBITMQ_USUARIO=${RABBITMQ_USUARIO:-centinela}
+PLANTILLA_RABBITMQ=deploy/rabbitmq/definiciones.plantilla.json
 
 aleatorio() { openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | cut -c1-32; }
 
@@ -41,14 +43,29 @@ escribir() { # nombre valor
   (umask 022 && printf '%s' "$2" > "$DIR/$1")
 }
 
-conf_rabbitmq() {
-  # RabbitMQ no lee la contraseña desde un archivo propio: se la damos en un archivo de
-  # configuración que compose monta en /etc/rabbitmq/conf.d/.
-  (umask 022 && {
-    echo "default_user = $RABBITMQ_USUARIO"
-    echo "default_pass = $(cat "$DIR/rabbitmq_password")"
-    echo "default_vhost = centinela"
-  } > "$DIR/rabbitmq.conf")
+# Hash de contraseña de RabbitMQ (rabbit_password_hashing_sha256): base64(sal de 4 bytes + SHA-256(sal + clave)).
+# Así el archivo de definiciones nunca lleva una contraseña en claro.
+hash_rabbitmq() { # archivo-con-la-clave
+  local tmp; tmp=$(mktemp -d)
+  openssl rand 4 > "$tmp/sal"
+  cat "$tmp/sal" "$1" | openssl dgst -sha256 -binary > "$tmp/resumen"
+  cat "$tmp/sal" "$tmp/resumen" | openssl base64 -A
+  rm -rf "$tmp"
+}
+
+definiciones_rabbitmq() {
+  # A3: un usuario por servicio con permisos mínimos; colas, DLQ y enlaces declarados aquí, no por los servicios.
+  local n
+  for n in rabbitmq_password rabbitmq_mesa_servicio_password rabbitmq_agente_password; do
+    [ -s "$DIR/$n" ] || { echo "Falta $DIR/$n: corre './scripts/secretos.sh generar' para crear las definiciones de RabbitMQ." >&2; return 0; }
+  done
+  (umask 022 && sed \
+    -e "s|__HASH_ADMIN__|$(hash_rabbitmq "$DIR/rabbitmq_password")|" \
+    -e "s|__HASH_MESA_SERVICIO__|$(hash_rabbitmq "$DIR/rabbitmq_mesa_servicio_password")|" \
+    -e "s|__HASH_AGENTE__|$(hash_rabbitmq "$DIR/rabbitmq_agente_password")|" \
+    "$PLANTILLA_RABBITMQ" > "$DIR/rabbitmq-definiciones.json")
+  # El formato anterior llevaba la contraseña del administrador en claro.
+  rm -f "$DIR/rabbitmq.conf"
 }
 
 ruta_llave() {
@@ -64,7 +81,7 @@ generar() {
   for n in "${NOMBRES[@]}"; do
     if [ ! -s "$DIR/$n" ]; then escribir "$n" "$(aleatorio)"; creados=$((creados + 1)); fi
   done
-  conf_rabbitmq
+  definiciones_rabbitmq
   echo "Secretos listos en $DIR/ ($creados nuevos)."
 }
 
@@ -116,7 +133,7 @@ descifrar() {
     else echo "Ignorando clave desconocida: $clave" >&2
     fi
   done < <(sops decrypt --input-type dotenv --output-type dotenv "$CIFRADO")
-  conf_rabbitmq
+  definiciones_rabbitmq
   echo "Secretos recreados en $DIR/."
 }
 

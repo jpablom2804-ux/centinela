@@ -115,6 +115,13 @@ Origen: A1–A13 salieron de la revisión propia. A14–A28 los encontró un rev
 - El corpus compartido es `tests/contratos/enmascarado.json`. `mesa-servicio` prueba que produce exactamente el texto esperado, y el agente prueba que ese texto pasa su verificación y que la entrada original no la pasa.
 - El ticket guardado no cambia: solo sale enmascarado lo que va a otro servicio. El `X-Request-ID` del cliente se valida antes de usarlo como `correlationId`, porque termina en logs y mensajes.
 
+A3 queda cubierto:
+- `deploy/rabbitmq/definiciones.plantilla.json` declara un usuario por servicio, sin permiso `configure`, que solo escribe en su exchange y solo lee su cola. También declara las colas y las DLQ.
+- Ya no hay `guest`. El administrador queda solo para operar.
+- Las contraseñas van como hashes SHA-256 con sal, generados por `secretos.sh`.
+- Una prueba de `mesa-servicio` contra RabbitMQ real comprueba que con su usuario no puede leer la cola del agente, declarar ni vaciar colas, ni publicar en `triajes`.
+- Falta la otra mitad, para cuando exista el consumidor: que `mesa-servicio` acepte un `TicketTriado` solo si el ticket existe y sigue en `nuevo`.
+
 ## Suite adversaria (`tests/adversarial/`)
 
 Cada caso es un archivo con la entrada, el ataque y el resultado esperado. Los 5 primeros son de la fase 1.

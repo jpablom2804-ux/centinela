@@ -40,15 +40,17 @@ services:
     image: docker.io/library/rabbitmq:4-management
     # Nombre de nodo fijo: sin esto, recrear el contenedor cambia el nodo y se pierden las colas del volumen.
     hostname: rabbitmq
-    # Usuario, contraseña y vhost por defecto, en un archivo de configuración montado como secreto.
+    # A3: usuarios por servicio, permisos, colas y DLQ salen del archivo de definiciones, que lleva los
+    # hashes de las contraseñas (por eso va como secreto). La configuración que lo carga no es secreta.
     secrets:
-      - source: rabbitmq_conf
-        target: /etc/rabbitmq/conf.d/20-centinela.conf
+      - source: rabbitmq_definiciones
+        target: /etc/rabbitmq/definiciones.json
     ports:
       - "127.0.0.1:5672:5672"
       - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq-datos:/var/lib/rabbitmq
+      - ./deploy/rabbitmq/20-centinela.conf:/etc/rabbitmq/conf.d/20-centinela.conf:ro,z
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -68,8 +70,8 @@ secrets:
     file: ./secrets/agente_db_password
   powerbi_ro_db_password:
     file: ./secrets/powerbi_ro_db_password
-  rabbitmq_conf:
-    file: ./secrets/rabbitmq.conf
+  rabbitmq_definiciones:
+    file: ./secrets/rabbitmq-definiciones.json
 
 volumes:
   postgres-datos:

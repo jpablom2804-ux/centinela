@@ -1,0 +1,36 @@
+{
+  "users": [
+    { "name": "centinela", "password_hash": "__HASH_ADMIN__", "hashing_algorithm": "rabbit_password_hashing_sha256", "tags": ["administrator"] },
+    { "name": "mesa_servicio", "password_hash": "__HASH_MESA_SERVICIO__", "hashing_algorithm": "rabbit_password_hashing_sha256", "tags": [] },
+    { "name": "agente", "password_hash": "__HASH_AGENTE__", "hashing_algorithm": "rabbit_password_hashing_sha256", "tags": [] }
+  ],
+  "vhosts": [{ "name": "centinela" }],
+  "permissions": [
+    { "user": "centinela", "vhost": "centinela", "configure": ".*", "write": ".*", "read": ".*" },
+    { "user": "mesa_servicio", "vhost": "centinela", "configure": "^$", "write": "^tickets$", "read": "^mesa-servicio\\.tickets-triados$" },
+    { "user": "agente", "vhost": "centinela", "configure": "^$", "write": "^triajes$", "read": "^agente\\.tickets-creados$" }
+  ],
+  "exchanges": [
+    { "name": "tickets", "vhost": "centinela", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "triajes", "vhost": "centinela", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {} },
+    { "name": "centinela.dlx", "vhost": "centinela", "type": "direct", "durable": true, "auto_delete": false, "internal": false, "arguments": {} }
+  ],
+  "queues": [
+    {
+      "name": "agente.tickets-creados", "vhost": "centinela", "durable": true, "auto_delete": false,
+      "arguments": { "x-queue-type": "quorum", "x-delivery-limit": 5, "x-dead-letter-exchange": "centinela.dlx", "x-dead-letter-routing-key": "agente.tickets-creados" }
+    },
+    { "name": "agente.tickets-creados.dlq", "vhost": "centinela", "durable": true, "auto_delete": false, "arguments": { "x-queue-type": "quorum" } },
+    {
+      "name": "mesa-servicio.tickets-triados", "vhost": "centinela", "durable": true, "auto_delete": false,
+      "arguments": { "x-queue-type": "quorum", "x-delivery-limit": 5, "x-dead-letter-exchange": "centinela.dlx", "x-dead-letter-routing-key": "mesa-servicio.tickets-triados" }
+    },
+    { "name": "mesa-servicio.tickets-triados.dlq", "vhost": "centinela", "durable": true, "auto_delete": false, "arguments": { "x-queue-type": "quorum" } }
+  ],
+  "bindings": [
+    { "source": "tickets", "vhost": "centinela", "destination": "agente.tickets-creados", "destination_type": "queue", "routing_key": "ticket.creado", "arguments": {} },
+    { "source": "triajes", "vhost": "centinela", "destination": "mesa-servicio.tickets-triados", "destination_type": "queue", "routing_key": "ticket.triado", "arguments": {} },
+    { "source": "centinela.dlx", "vhost": "centinela", "destination": "agente.tickets-creados.dlq", "destination_type": "queue", "routing_key": "agente.tickets-creados", "arguments": {} },
+    { "source": "centinela.dlx", "vhost": "centinela", "destination": "mesa-servicio.tickets-triados.dlq", "destination_type": "queue", "routing_key": "mesa-servicio.tickets-triados", "arguments": {} }
+  ]
+}

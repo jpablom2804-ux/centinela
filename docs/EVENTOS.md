@@ -91,6 +91,15 @@ Todo vive en el vhost `centinela` de RabbitMQ.
 
 | Exchange / cola | Uso |
 |---|---|
-| `tickets` → `agente.tickets-creados` | Trabajo para el agente. Exchange `direct`, clave `ticket.creado`. El exchange lo declara `mesa-servicio`; la cola y su DLQ, el `agente`. Si no hay cola enlazada, el broker devuelve el mensaje y el outbox lo reintenta: nunca se pierde en silencio |
+| `tickets` → `agente.tickets-creados` | Trabajo para el agente. Exchange `direct`, clave `ticket.creado`. Si no hay cola enlazada, el broker devuelve el mensaje y el outbox lo reintenta: nunca se pierde en silencio |
 | `triajes` → `mesa-servicio.tickets-triados` | Resultados del agente |
-| `*.dlq` | Mensajes muertos de cada cola |
+| `*.dlq` | Mensajes muertos de cada cola, por el exchange `centinela.dlx` |
+
+Todo esto se declara en [deploy/rabbitmq/definiciones.plantilla.json](../deploy/rabbitmq/definiciones.plantilla.json), no lo crean los servicios (A3):
+
+- **Colas quorum** con `x-delivery-limit: 5`: un mensaje que se reentrega 5 veces sin ack (por ejemplo, porque tumba al consumidor) va a su DLQ en vez de repetirse para siempre.
+- **Un usuario por servicio, sin permiso `configure`:**
+  - `mesa_servicio` solo escribe en `tickets` y solo lee `mesa-servicio.tickets-triados`;
+  - `agente` solo escribe en `triajes` y solo lee `agente.tickets-creados`.
+- **`centinela` es el administrador,** solo para operar y para el panel.
+- **Contraseñas sin texto plano:** el archivo final lleva los hashes y lo genera `./scripts/secretos.sh`.

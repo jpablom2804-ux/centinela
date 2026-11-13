@@ -19,10 +19,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -37,8 +38,12 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 class TicketCreadoOutboxTest extends PruebaIntegracion {
 
-    private static final String COLA = "prueba.tickets-creados";
+    /** La cola real del agente, declarada en deploy/rabbitmq (A3). La prueba la lee como administrador. */
+    private static final String COLA = "agente.tickets-creados";
     private static final String USUARIO = "coordinador1";
+    private static final CachingConnectionFactory CONEXION_ADMIN = conexionAdmin();
+    private static final RabbitTemplate RABBIT_ADMIN = new RabbitTemplate(CONEXION_ADMIN);
+    private static final RabbitAdmin ADMIN = new RabbitAdmin(CONEXION_ADMIN);
     private static final String TICKET_CON_DATOS = """
             {"tipo":"incidente","titulo":"Bloqueo de la cuenta de ana@banco.cr",\
             "descripcion":"Mi cédula es 1-2345-0678 y mi celular 8888-1234. La contraseña: Banco2026! no sirve.",\
@@ -50,9 +55,18 @@ class TicketCreadoOutboxTest extends PruebaIntegracion {
     @Autowired JdbcTemplate jdbc;
     @Autowired RelevoOutbox relevo;
     @Autowired Outbox outbox;
-    @Autowired AmqpAdmin admin;
-    @Autowired RabbitTemplate rabbit;
+    /** Los de la aplicación: conectados como mesa_servicio. */
+    @Autowired AmqpAdmin adminDeLaApp;
+    @Autowired RabbitTemplate rabbitDeLaApp;
     @Autowired RelojMovible reloj;
+
+    private static CachingConnectionFactory conexionAdmin() {
+        var conexion = new CachingConnectionFactory(RABBIT.getHost(), RABBIT.getAmqpPort());
+        conexion.setUsername("centinela");
+        conexion.setPassword(CLAVE_MQ_ADMIN);
+        conexion.setVirtualHost("centinela");
+        return conexion;
+    }
 
     private String crear() throws Exception {
         var peticion = post("/api/tickets").content(TICKET_CON_DATOS).contentType(MediaType.APPLICATION_JSON)
@@ -62,15 +76,12 @@ class TicketCreadoOutboxTest extends PruebaIntegracion {
     }
 
     private void conColaEnlazada() {
-        admin.deleteQueue(COLA);
-        var cola = new Queue(COLA, true);
-        admin.declareQueue(cola);
-        admin.declareBinding(enlace(cola));
+        ADMIN.declareBinding(ENLACE);
+        ADMIN.purgeQueue(COLA, false);
     }
 
-    private static Binding enlace(Queue cola) {
-        return BindingBuilder.bind(cola).to(new DirectExchange(PublicadorTicketCreado.EXCHANGE)).with(PublicadorTicketCreado.RUTA);
-    }
+    private static final Binding ENLACE =
+            new Binding(COLA, Binding.DestinationType.QUEUE, PublicadorTicketCreado.EXCHANGE, PublicadorTicketCreado.RUTA, null);
 
     private void publicarTodo() {
         while (relevo.publicarPendientes() > 0) {
@@ -80,7 +91,7 @@ class TicketCreadoOutboxTest extends PruebaIntegracion {
 
     private Message recibirDe(String ticketId) {
         for (var i = 0; i < 500; i++) {
-            var mensaje = rabbit.receive(COLA, 2000);
+            var mensaje = RABBIT_ADMIN.receive(COLA, 2000);
             assertThat(mensaje).as("no llegó el TicketCreado del ticket %s", ticketId).isNotNull();
             if (sobre(mensaje).get("datos").get("ticketId").asString().equals(ticketId)) {
                 return mensaje;
@@ -150,12 +161,16 @@ class TicketCreadoOutboxTest extends PruebaIntegracion {
 
     @Test
     void sin_cola_no_se_da_por_publicado_y_se_reintenta_con_espera() throws Exception {
-        admin.deleteQueue(COLA);
-        var id = crear();
-        var evento = jdbc.queryForObject("select id::text from mesa_servicio.outbox where cuerpo::json->'datos'->>'ticketId' = ?",
-                String.class, id);
-
-        relevo.publicarPendientes();
+        ADMIN.removeBinding(ENLACE);
+        String evento;
+        try {
+            var id = crear();
+            evento = jdbc.queryForObject("select id::text from mesa_servicio.outbox where cuerpo::json->'datos'->>'ticketId' = ?",
+                    String.class, id);
+            relevo.publicarPendientes();
+        } finally {
+            ADMIN.declareBinding(ENLACE);
+        }
 
         var fila = jdbc.queryForMap("select publicado_en, intentos, ultimo_error, proximo_intento from mesa_servicio.outbox where id = ?::uuid",
                 evento);
@@ -163,6 +178,19 @@ class TicketCreadoOutboxTest extends PruebaIntegracion {
         assertThat(fila.get("intentos")).isEqualTo(1);
         assertThat(fila.get("ultimo_error")).isEqualTo("SIN_COLA");
         assertThat(((java.sql.Timestamp) fila.get("proximo_intento")).toInstant()).isAfter(reloj.instant());
+    }
+
+    @Test
+    void mesa_servicio_solo_puede_publicar_en_su_exchange() {
+        // A3: con su usuario no lee la cola del agente, no declara ni borra colas y no publica en triajes.
+        assertThatThrownBy(() -> rabbitDeLaApp.receive(COLA)).isInstanceOf(AmqpException.class);
+        assertThatThrownBy(() -> adminDeLaApp.declareQueue(new Queue("intrusa", true))).isInstanceOf(AmqpException.class);
+        assertThatThrownBy(() -> adminDeLaApp.purgeQueue(COLA, false)).isInstanceOf(AmqpException.class);
+        assertThatThrownBy(() -> rabbitDeLaApp.invoke(operaciones -> {
+            operaciones.convertAndSend("triajes", "ticket.triado", "{}");
+            operaciones.waitForConfirmsOrDie(5000);
+            return null;
+        })).hasStackTraceContaining("ACCESS_REFUSED");
     }
 
     @Test

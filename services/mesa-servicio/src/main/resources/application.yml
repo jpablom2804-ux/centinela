@@ -28,8 +28,8 @@ spring:
     host: ${CENTINELA_MQ_HOST:127.0.0.1}
     port: ${CENTINELA_MQ_PUERTO:5672}
     virtual-host: centinela
-    username: centinela
-    password: ${rabbitmq_password:}
+    username: mesa_servicio
+    password: ${rabbitmq_mesa_servicio_password:}
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
