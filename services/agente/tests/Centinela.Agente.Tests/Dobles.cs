@@ -107,11 +107,13 @@ public static class Fabrica
 
     public static RepositorioDatosPrueba Repositorio => Repo.Value;
 
+    public static IConsultasMesaServicio Consultas => new ConsultasDatosPrueba(Repo.Value);
+
     public static IHerramienta[] Herramientas() =>
     [
-        new HerramientaBuscarTicketsSimilares(Repositorio),
-        new HerramientaBuscarArticulos(Repositorio),
-        new HerramientaConsultarEstadoServicio(Repositorio),
+        new HerramientaBuscarTicketsSimilares(Consultas),
+        new HerramientaBuscarArticulos(Consultas),
+        new HerramientaConsultarEstadoServicio(Consultas),
     ];
 
     public static CicloAgente Ciclo(IClienteLlm cliente, OpcionesAgente? opciones = null, ILogger<CicloAgente>? logger = null) =>

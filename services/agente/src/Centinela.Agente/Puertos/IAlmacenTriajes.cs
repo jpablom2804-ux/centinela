@@ -10,6 +10,9 @@ public interface IAlmacenTriajes
     /// Si la réplica cae, el bloqueo se libera solo.
     /// </summary>
     Task<ISesionTicket?> TomarTicketAsync(Guid ticketId, CancellationToken ct);
+
+    /// <summary>Tokens de entrada y salida gastados en triajes desde el instante dado (para el tope diario).</summary>
+    Task<long> TokensUsadosDesdeAsync(DateTimeOffset desde, CancellationToken ct);
 }
 
 /// <summary>Operaciones sobre un ticket tomado en exclusiva. Al liberarla, otra réplica puede tomarlo.</summary>

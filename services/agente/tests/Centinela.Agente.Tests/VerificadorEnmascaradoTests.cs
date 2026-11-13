@@ -70,4 +70,26 @@ public class VerificadorEnmascaradoTests
 
         Assert.Contains(VerificadorEnmascarado.Tarjeta, VerificadorEnmascarado.DetectarEnContenido(Json));
     }
+
+    [Fact]
+    public void Ids_y_fechas_de_los_sistemas_no_son_datos_personales()
+    {
+        // Lo que devuelve la API interna: UUID con tramos de dígitos y fechas con microsegundos (8 dígitos seguidos).
+        const string Json = """
+            [{"id":"84211305-9817-4c2e-8a1b-000000000001","titulo":"SINPE rechaza transferencias","estado":"nuevo",
+              "desde":"2026-11-13T01:06:16.989186Z"},{"id":"KB-002","titulo":"Diagnóstico de la VPN"}]
+            """;
+
+        Assert.Empty(VerificadorEnmascarado.DetectarEnContenido(Json));
+    }
+
+    [Theory]
+    [InlineData("""{"id":"1-2345-0678"}""")]
+    [InlineData("""{"desde":"llamar al 8888-1234"}""")]
+    [InlineData("""{"titulo":"84211305-9817-4c2e-8a1b-000000000001"}""")]
+    [InlineData("""{"id":"84211305-9817-4c2e-8a1b-000000000001","titulo":"cédula 1-2345-0678"}""")]
+    public void La_excepcion_solo_vale_para_el_formato_exacto_en_su_campo(string json)
+    {
+        Assert.NotEmpty(VerificadorEnmascarado.DetectarEnContenido(json));
+    }
 }

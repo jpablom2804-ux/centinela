@@ -32,6 +32,12 @@ flowchart LR
   - el agente se conecta a RabbitMQ con su propio usuario: solo lee su cola y solo escribe en `triajes` (A3);
   - en PostgreSQL usa su propio esquema, con migraciones embebidas que se aplican al arrancar.
 - **Logs en JSON** con el `correlationId` que viene desde la petición original a `mesa-servicio`.
+- **Herramientas con datos reales:** como worker, las tres herramientas consultan la API interna de solo lectura de `mesa-servicio`.
+  - Tickets similares y artículos se buscan por significado, con Voyage AI y pgvector.
+  - Se conecta con su propia cuenta de servicio (`secrets/api_interna_agente_password`) y un timeout corto.
+  - Si la API no responde, la herramienta le dice al modelo que siga sin ese dato.
+  - En modo archivo y en las pruebas usan los datos sintéticos de `datos-prueba.json`.
+- **Tope diario de tokens** (`Agente:TopeDiarioTokens`, 500.000 por defecto): al alcanzarlo, el ticket sale como `presupuesto_agotado` sin llamar al modelo y queda para triaje manual.
 
 ## El ciclo
 
@@ -55,7 +61,7 @@ Requisitos: SDK de .NET 10 (`global.json` lo fija).
 
 ```bash
 cd services/agente
-dotnet test    # 159 pruebas: 157 sin gastar tokens (incluye PostgreSQL y RabbitMQ reales con Testcontainers), 2 con el modelo real (saltadas)
+dotnet test    # 170 pruebas: 168 sin gastar tokens (incluye PostgreSQL y RabbitMQ reales con Testcontainers), 2 con el modelo real (saltadas)
 
 # Primera vez: la API key va como secreto, fuera del repo (ADR-005)
 dotnet user-secrets set "Llm:ApiKey" "<tu key>" --project src/Centinela.Agente

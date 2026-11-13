@@ -32,6 +32,14 @@ public sealed class AlmacenTriajesPostgres(NpgsqlDataSource fuente) : IAlmacenTr
         return null;
     }
 
+    public async Task<long> TokensUsadosDesdeAsync(DateTimeOffset desde, CancellationToken ct)
+    {
+        await using var comando = fuente.CreateCommand(
+            "SELECT COALESCE(SUM(tokens_entrada + tokens_salida), 0)::bigint FROM agente.triaje WHERE creado_en >= @desde");
+        comando.Parameters.AddWithValue("desde", desde);
+        return (long)(await comando.ExecuteScalarAsync(ct))!;
+    }
+
     private sealed class Sesion(NpgsqlConnection conexion, Guid ticketId) : ISesionTicket
     {
         public async Task<bool> MensajeYaProcesadoAsync(Guid mensajeId, CancellationToken ct)

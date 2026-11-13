@@ -61,7 +61,7 @@ public sealed class EntornoWorker : IAsyncLifetime
     }.CreateConnectionAsync();
 
     /// <summary>Un agente completo (worker) con el modelo falso; la configuración es la misma que fuera de las pruebas.</summary>
-    public IHost CrearAgente(ClienteLlmFalso llm)
+    public IHost CrearAgente(ClienteLlmFalso llm, IDictionary<string, string?>? extra = null)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { DisableDefaults = true, ContentRootPath = AppContext.BaseDirectory });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -76,7 +76,9 @@ public sealed class EntornoWorker : IAsyncLifetime
             ["BaseDatos:Host"] = Postgres.Hostname,
             ["BaseDatos:Puerto"] = Postgres.GetMappedPublicPort(5432).ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["agente_db_password"] = ClaveAgenteBd,
+            ["api_interna_agente_password"] = "clave-api-interna-prueba",
         });
+        if (extra is not null) builder.Configuration.AddInMemoryCollection(extra);
         builder.Services.AgregarAgente(builder.Configuration, Path.Combine(AppContext.BaseDirectory, "Infraestructura", "Herramientas", "datos-prueba.json"));
         builder.Services.AgregarWorker(builder.Configuration);
         builder.Services.AddSingleton<IClienteLlm>(llm);
@@ -297,6 +299,28 @@ public sealed class WorkerIntegracionTests(EntornoWorker entorno) : IAsyncLifeti
         var (_, sobre) = Assert.Single(recibidos);
         Assert.Equal(ticketId, sobre.GetProperty("datos").GetProperty("ticketId").GetGuid());
         Assert.Single(rapido.Solicitudes);
+    }
+
+    [Fact]
+    public async Task ConElTopeDiarioAlcanzadoNoLlamaAlModeloYElTicketVaATriajeManual()
+    {
+        var llm = ModeloQueTria();
+        using var agente = await ArrancarAsync(entorno.CrearAgente(llm, new Dictionary<string, string?> { ["Agente:TopeDiarioTokens"] = "1" }));
+        var primero = Guid.NewGuid();
+        var segundo = Guid.NewGuid();
+
+        // El primero puede triarse si nada se gastó hoy; con eso el tope (1 token) queda superado para el segundo.
+        await PublicarAsync(TicketCreado(Guid.NewGuid(), primero));
+        Assert.NotEmpty(await RecibirAsync(ColaSalida, 1));
+        await PublicarAsync(TicketCreado(Guid.NewGuid(), segundo));
+        var recibidos = await RecibirAsync(ColaSalida, 1);
+        await agente.StopAsync();
+
+        var datos = Assert.Single(recibidos).Sobre.GetProperty("datos");
+        Assert.Equal(segundo, datos.GetProperty("ticketId").GetGuid());
+        Assert.Equal("presupuesto_agotado", datos.GetProperty("estadoAnalisis").GetString());
+        Assert.Equal(JsonValueKind.Null, datos.GetProperty("prioridadSugerida").ValueKind);
+        Assert.True(llm.Solicitudes.Count <= 1);
     }
 
     [Fact]

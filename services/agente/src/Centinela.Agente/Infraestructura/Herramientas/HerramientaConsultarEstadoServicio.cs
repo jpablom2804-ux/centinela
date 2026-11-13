@@ -6,7 +6,7 @@ using Centinela.Agente.Puertos;
 namespace Centinela.Agente.Infraestructura.Herramientas;
 
 /// <summary>Dice si un sistema tiene incidentes abiertos: ayuda a detectar caídas generales y duplicados.</summary>
-public sealed class HerramientaConsultarEstadoServicio(RepositorioDatosPrueba repositorio) : IHerramienta
+public sealed class HerramientaConsultarEstadoServicio(IConsultasMesaServicio consultas) : IHerramienta
 {
     public const string Nombre = "consultar_estado_servicio";
 
@@ -29,21 +29,29 @@ public sealed class HerramientaConsultarEstadoServicio(RepositorioDatosPrueba re
             },
         });
 
-    // [FLUJO TRIAJE_AGENTE 6b] Valida la entrada del modelo y busca en los datos de prueba → resultado como dato no confiable
-    public Task<ResultadoEjecucion> EjecutarAsync(JsonElement entrada, ContextoHerramienta contexto, CancellationToken ct)
+    // [FLUJO TRIAJE_AGENTE 6b] Valida la entrada del modelo y consulta (API interna o datos de prueba) → resultado como dato no confiable
+    public async Task<ResultadoEjecucion> EjecutarAsync(JsonElement entrada, ContextoHerramienta contexto, CancellationToken ct)
     {
         var (sistema, error) = EntradaHerramienta.LeerTexto(entrada, "sistema", 2, 50);
-        if (sistema is null) return Task.FromResult(ResultadoEjecucion.Error(error!));
-        if (!Catalogos.Sistemas.Contains(sistema)) return Task.FromResult(ResultadoEjecucion.Error("Sistema fuera del catálogo."));
+        if (sistema is null) return ResultadoEjecucion.Error(error!);
+        if (!Catalogos.Sistemas.Contains(sistema)) return ResultadoEjecucion.Error("Sistema fuera del catálogo.");
 
-        var incidentes = repositorio.Datos.IncidentesAbiertos
-            .Where(i => i.Sistema == sistema)
-            .OrderByDescending(i => i.Desde)
+        IReadOnlyList<IncidenteServicio> abiertos;
+        try
+        {
+            abiertos = await consultas.IncidentesAbiertosAsync(sistema, EntradaHerramienta.MaxResultados, ct);
+        }
+        catch (ConsultaNoDisponibleException)
+        {
+            return ResultadoEjecucion.Error(EntradaHerramienta.FuenteNoDisponible);
+        }
+
+        var incidentes = abiertos
             .Take(EntradaHerramienta.MaxResultados)
-            .Select(i => new { id = i.Id, titulo = i.Titulo, estado = i.Estado, desde = i.Desde })
+            .Select(i => new { id = i.Id, titulo = EntradaHerramienta.Recortar(i.Titulo, 200), estado = i.Estado, desde = i.Desde })
             .ToList();
 
-        // Los incidentes no se pueden sugerir como duplicados: no son tickets, así que no se devuelven IDs.
-        return Task.FromResult(new ResultadoEjecucion(EntradaHerramienta.Resultado(incidentes), EsError: false, []));
+        // Los incidentes no se pueden sugerir como duplicados desde aquí: no se devuelven IDs.
+        return new ResultadoEjecucion(EntradaHerramienta.Resultado(incidentes), EsError: false, []);
     }
 }

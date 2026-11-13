@@ -64,9 +64,26 @@ public static partial class VerificadorEnmascarado
         }
 
         var encontrados = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var texto in Textos(raiz)) encontrados.UnionWith(Detectar(texto));
+        foreach (var (clave, texto) in Textos(null, raiz))
+        {
+            if (EsValorEstructural(clave, texto)) continue;
+            encontrados.UnionWith(Detectar(texto));
+        }
+
         return encontrados;
     }
+
+    /// <summary>
+    /// IDs y fechas que generan los sistemas (UUID, KB-001, 2026-11-13T01:06:16.989186Z) tienen tramos de dígitos que
+    /// parecen teléfonos o cédulas. Se exceptúan solo si la clave es de ID o de fecha Y el valor tiene exactamente ese
+    /// formato: un dato personal no cabe en un UUID o una fecha exactos, y cualquier otro texto se revisa igual.
+    /// </summary>
+    private static bool EsValorEstructural(string? clave, string valor) => clave switch
+    {
+        "id" or "ticketId" => Guid.TryParseExact(valor, "D", out _) || PatronCodigoInterno().IsMatch(valor),
+        "desde" or "creadoEn" or "ocurridoEn" or "recibidaEn" => PatronInstante().IsMatch(valor),
+        _ => false,
+    };
 
     /// <summary>NFKC, sin caracteres de formato invisibles (Unicode Cf) y con separadores unificados.</summary>
     public static string Normalizar(string texto)
@@ -93,14 +110,23 @@ public static partial class VerificadorEnmascarado
         return limpio.ToString();
     }
 
-    private static IEnumerable<string> Textos(JsonNode? nodo) => nodo switch
+    /// <summary>Cada texto del JSON (claves incluidas) con la clave de la que cuelga, ya decodificado.</summary>
+    private static IEnumerable<(string? Clave, string Texto)> Textos(string? clave, JsonNode? nodo) => nodo switch
     {
-        JsonObject o => o.SelectMany(p => Textos(p.Value).Prepend(p.Key)),
-        JsonArray a => a.SelectMany(Textos),
-        JsonValue v when v.TryGetValue<string>(out var s) => [s],
-        JsonValue v => [v.ToJsonString()],
+        JsonObject o => o.SelectMany(p => Textos(p.Key, p.Value).Prepend((null, p.Key))),
+        JsonArray a => a.SelectMany(n => Textos(clave, n)),
+        JsonValue v when v.TryGetValue<string>(out var s) => [(clave, s)],
+        JsonValue v => [(clave, v.ToJsonString())],
         _ => [],
     };
+
+    // Códigos de los propios sistemas: KB-001, TK-1001, INC-501.
+    [GeneratedRegex(@"^[A-Z]{2,4}-\d{3,6}$")]
+    private static partial Regex PatronCodigoInterno();
+
+    // ISO-8601 completo con zona: 2026-11-13T01:06:16.989186Z o 2026-11-13T01:06:16+00:00.
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$")]
+    private static partial Regex PatronInstante();
 
     private static string? Clasificar(string valor)
     {

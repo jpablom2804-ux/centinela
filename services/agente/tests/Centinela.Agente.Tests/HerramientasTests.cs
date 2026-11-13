@@ -17,7 +17,7 @@ public class HerramientasTests
     [Fact]
     public async Task Buscar_tickets_encuentra_los_de_vpn_primero()
     {
-        var herramienta = new HerramientaBuscarTicketsSimilares(Fabrica.Repositorio);
+        var herramienta = new HerramientaBuscarTicketsSimilares(Fabrica.Consultas);
 
         var resultado = await herramienta.EjecutarAsync(Json("""{"consulta":"vpn no conecta desde casa"}"""), Contexto, CancellationToken.None);
 
@@ -34,7 +34,7 @@ public class HerramientasTests
     [InlineData("""["vpn"]""")]
     public async Task Buscar_articulos_rechaza_entradas_invalidas(string entrada)
     {
-        var herramienta = new HerramientaBuscarArticulos(Fabrica.Repositorio);
+        var herramienta = new HerramientaBuscarArticulos(Fabrica.Consultas);
 
         var resultado = await herramienta.EjecutarAsync(Json(entrada), Contexto, CancellationToken.None);
 
@@ -45,7 +45,7 @@ public class HerramientasTests
     [Fact]
     public async Task Estado_de_servicio_devuelve_incidentes_del_sistema_y_rechaza_sistemas_desconocidos()
     {
-        var herramienta = new HerramientaConsultarEstadoServicio(Fabrica.Repositorio);
+        var herramienta = new HerramientaConsultarEstadoServicio(Fabrica.Consultas);
 
         var vpn = await herramienta.EjecutarAsync(Json("""{"sistema":"vpn"}"""), Contexto, CancellationToken.None);
         var desconocido = await herramienta.EjecutarAsync(Json("""{"sistema":"base_de_datos_de_clientes"}"""), Contexto, CancellationToken.None);

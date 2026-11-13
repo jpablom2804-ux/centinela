@@ -40,4 +40,11 @@ public sealed class OpcionesAgente
 
     /// <summary>A15: dominios que pueden aparecer como enlace en la justificación o el borrador. Vacío = ningún enlace.</summary>
     public List<string> DominiosPermitidos { get; set; } = [];
+
+    /// <summary>
+    /// Tokens (entrada + salida) que el agente puede gastar por día UTC. Al alcanzarlo, los tickets pasan a triaje
+    /// manual sin llamar al modelo. La alerta de costo en dinero la calcula reportes, que conoce los precios.
+    /// </summary>
+    [Range(1, 1_000_000_000)]
+    public long TopeDiarioTokens { get; set; } = 500_000;
 }

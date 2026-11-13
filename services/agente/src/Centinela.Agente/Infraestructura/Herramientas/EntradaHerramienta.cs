@@ -13,6 +13,9 @@ public static class EntradaHerramienta
 {
     public const int MaxResultados = 5;
 
+    /// <summary>Lo que ve el modelo si la fuente no responde: el triaje sigue sin ese dato.</summary>
+    public const string FuenteNoDisponible = "No se pudo consultar mesa-servicio en este momento; continúa el triaje sin este dato.";
+
     private static readonly JsonSerializerOptions OpcionesSalida = new(JsonSerializerDefaults.Web)
     {
         Encoder = JavaScriptEncoder.Default,

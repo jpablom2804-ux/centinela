@@ -1,4 +1,5 @@
 using Centinela.Agente.Aplicacion;
+using Centinela.Agente.Infraestructura.ApiInterna;
 using Centinela.Agente.Infraestructura.Herramientas;
 using Centinela.Agente.Infraestructura.Llm;
 using Centinela.Agente.Infraestructura.Mensajeria;
@@ -35,10 +36,13 @@ public static class Composicion
                 ? sp.GetRequiredService<ClienteOpenAiCompatibleHttp>()
                 : sp.GetRequiredService<ClienteAnthropicHttp>());
         servicios.AddSingleton(TimeProvider.System);
+        // Por defecto, los datos sintéticos (modo archivo); el worker los reemplaza por la API interna de mesa-servicio.
         servicios.AddSingleton(RepositorioDatosPrueba.Cargar(rutaDatosPrueba));
-        servicios.AddSingleton<IHerramienta, HerramientaBuscarTicketsSimilares>();
-        servicios.AddSingleton<IHerramienta, HerramientaBuscarArticulos>();
-        servicios.AddSingleton<IHerramienta, HerramientaConsultarEstadoServicio>();
+        servicios.AddSingleton<IConsultasMesaServicio, ConsultasDatosPrueba>();
+        // Transitorias: el cliente HTTP de la API interna se maneja con IHttpClientFactory.
+        servicios.AddTransient<IHerramienta, HerramientaBuscarTicketsSimilares>();
+        servicios.AddTransient<IHerramienta, HerramientaBuscarArticulos>();
+        servicios.AddTransient<IHerramienta, HerramientaConsultarEstadoServicio>();
         servicios.AddTransient<CicloAgente>();
         return servicios;
     }
@@ -59,6 +63,14 @@ public static class Composicion
             .ValidateOnStart();
 
         servicios.AddSingleton(sp => NpgsqlDataSource.Create(sp.GetRequiredService<IOptions<OpcionesBaseDatos>>().Value.CadenaConexion()));
+        servicios.AddOptions<OpcionesApiInterna>()
+            .Bind(configuracion.GetSection(OpcionesApiInterna.Seccion))
+            .PostConfigure(o => o.Password = configuracion[OpcionesApiInterna.ClaveSecreto] ?? o.Password)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        // Las herramientas consultan datos reales (fase 3): reemplaza a los datos sintéticos.
+        servicios.AddHttpClient<IConsultasMesaServicio, ClienteApiInterna>();
+
         servicios.AddSingleton<IAlmacenTriajes, AlmacenTriajesPostgres>();
         servicios.AddSingleton<ConexionRabbit>();
         servicios.AddSingleton<IPublicadorTriajes, PublicadorTriajesRabbit>();
