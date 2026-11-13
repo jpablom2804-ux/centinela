@@ -10,11 +10,15 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.15" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.15" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.15" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="RabbitMQ.Client" Version="7.2.2" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Instrucciones del sistema: fijas, versionadas y fuera del código. -->
     <EmbeddedResource Include="Aplicacion\Prompts\sistema.md" LogicalName="Centinela.Agente.Prompts.sistema.md" />
+    <!-- Migraciones del esquema propio, aplicadas al arrancar el worker (MigradorEsquema). -->
+    <EmbeddedResource Include="Infraestructura\Persistencia\Migraciones\*.sql" />
     <!-- Datos sintéticos que usan las herramientas en la fase 1 (en la fase 3 vienen de mesa-servicio). -->
     <None Update="Infraestructura\Herramientas\datos-prueba.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />

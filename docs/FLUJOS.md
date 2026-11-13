@@ -50,7 +50,11 @@ Empieza en `mesa-servicio` (rutas bajo `services/mesa-servicio/src/main/java/cr/
 | 1 | `tickets/internal/PublicadorTicketCreado.java` | `registrar` | Enmascara título, descripción y sistema reportado (`plataforma/Enmascarador`); el ticket guardado no cambia |
 | 2 | `plataforma/mensajeria/Outbox.java` | `registrar` | Arma el sobre (`id`, `tipo`, `version`, `correlationId`, `ocurridoEn`) y lo guarda sin publicar; exige estar dentro de la transacción del cambio |
 | 3 | `plataforma/mensajeria/RelevoOutbox.java` | `publicarPendientes` | Cada 2 s toma un lote con `FOR UPDATE SKIP LOCKED` (varias réplicas sin pisarse), publica en el exchange `tickets` y marca publicado solo con el ack del broker y si llegó a una cola; si no, reintenta con backoff hasta un máximo |
-| 4… | `agente` | — | Fase 3, siguiente punto: el worker consume `agente.tickets-creados` |
+| 4 | `agente`: `Infraestructura/Mensajeria/ConsumidorTicketsCreados.cs` | `AtenderAsync` | Recibe de `agente.tickets-creados` (prefetch 1, ack manual) y valida el sobre v1; lo que no cumple va a la DLQ sin llamar al modelo. Al arrancar, `Program` migra el esquema propio antes de consumir |
+| 5 | `agente`: `Aplicacion/ProcesadorTicketCreado.cs` | `ProcesarAsync` | Toma el ticket en exclusiva (advisory lock de PostgreSQL) y descarta el mensaje ya procesado (`id`) |
+| 6 | `agente`: `Aplicacion/ProcesadorTicketCreado.cs` → `CicloAgente.TriarAsync` | `ProcesarAsync` | Si el ticket no estaba triado, corre el ciclo (`TRIAJE_AGENTE` 2–8) y guarda el resultado antes de publicar |
+| 7 | `agente`: `Aplicacion/ProcesadorTicketCreado.cs` → `Infraestructura/Mensajeria/PublicadorTriajesRabbit.cs` | `ProcesarAsync` → `PublicarAsync` | Publica `TicketTriado` en `triajes` con confirmación y mandatory (si ya estaba triado, republica el mismo evento), registra el mensaje y recién ahí hace ack |
+| 8… | `mesa-servicio` | — | Fase 3, siguiente punto: consumir `mesa-servicio.tickets-triados` y guardar la sugerencia sin aplicarla |
 
 ## CAMBIAR_ESTADO
 

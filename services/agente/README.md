@@ -1,6 +1,37 @@
-# Agente de triaje (fase 1)
+# Agente de triaje
 
 Agente de IA escrito desde cero en C# (.NET 10), sin frameworks de agentes. Recibe un ticket de la mesa de servicio, investiga con tres herramientas de solo lectura y devuelve una **sugerencia** de triaje: categoría, sistema afectado, prioridad, posibles duplicados, artículos y un borrador de respuesta. **No toma ninguna acción**: un técnico acepta, corrige o descarta la sugerencia.
+
+Corre de dos maneras:
+- **Como worker (fase 3):** consume `TicketCreado` de RabbitMQ y publica `TicketTriado`.
+- **Con un ticket desde un archivo (fase 1):** sirve para probar el modelo sin levantar nada más.
+
+## Como worker
+
+```mermaid
+flowchart LR
+    Q[(agente.tickets-creados)] --> L{¿cumple el<br/>contrato v1?}
+    L -- no --> D[(DLQ)]
+    L -- sí --> B{ticket tomado<br/>por otra réplica?}
+    B -- sí --> X[se descarta esta copia]
+    B -- no --> G{¿ya triado?}
+    G -- sí --> R[republica el mismo evento<br/>sin llamar al modelo]
+    G -- no --> C[ciclo del agente] --> S[guarda el triaje] --> P[publica TicketTriado<br/>con confirmación] --> A[ack]
+    R --> A
+```
+
+- **Nunca paga dos veces el mismo triaje:**
+  - un mensaje ya procesado (por `id`) se descarta;
+  - un ticket ya triado (por `ticketId`) se republica desde la base, con el mismo id de evento;
+  - dos réplicas nunca procesan el mismo ticket a la vez. El bloqueo es un *advisory lock* de PostgreSQL atado a la conexión: si la réplica cae, se libera solo.
+- **Tumbarlo a mitad no pierde tickets:** el ack va después de publicar. Si cae antes, RabbitMQ entrega el mensaje de nuevo y otra réplica (o la misma al volver) termina el trabajo. Una prueba lo hace de verdad: apaga un agente mientras "piensa" y verifica que el segundo publica el triaje.
+- **Lo que no cumple el contrato va a la DLQ** sin llamar al modelo.
+- **Las fallas de base de datos o broker se reintentan** con backoff (3 veces) y después van a la DLQ.
+- **Un error inesperado** devuelve el mensaje a la cola, y la cola quorum lo manda a la DLQ a la quinta entrega.
+- **Permisos mínimos:**
+  - el agente se conecta a RabbitMQ con su propio usuario: solo lee su cola y solo escribe en `triajes` (A3);
+  - en PostgreSQL usa su propio esquema, con migraciones embebidas que se aplican al arrancar.
+- **Logs en JSON** con el `correlationId` que viene desde la petición original a `mesa-servicio`.
 
 ## El ciclo
 
@@ -24,15 +55,18 @@ Requisitos: SDK de .NET 10 (`global.json` lo fija).
 
 ```bash
 cd services/agente
-dotnet test                                                      # 133 pruebas: 131 sin gastar tokens, 2 con el modelo real (saltadas)
+dotnet test    # 159 pruebas: 157 sin gastar tokens (incluye PostgreSQL y RabbitMQ reales con Testcontainers), 2 con el modelo real (saltadas)
 
 # Primera vez: la API key va como secreto, fuera del repo (ADR-005)
 dotnet user-secrets set "Llm:ApiKey" "<tu key>" --project src/Centinela.Agente
 
+# Un ticket desde un archivo: el resultado sale por stdout; los logs (JSON, solo IDs y métricas), por stderr
 dotnet run --project src/Centinela.Agente -- ejemplos/ticket.json
-```
 
-El resultado sale por stdout. Los logs, en JSON y solo con IDs y métricas, salen por stderr.
+# Como worker: con el compose de la raíz levantado y las contraseñas de secrets/ (ruta ABSOLUTA)
+export CENTINELA_SECRETOS="$(cd ../../secrets && pwd)"   # en Git Bash: "$(cygpath -m "$(cd ../../secrets && pwd)")"
+dotnet run --project src/Centinela.Agente
+```
 
 ### Usar Qwen en vez de Claude (gratis o casi, ADR-006)
 

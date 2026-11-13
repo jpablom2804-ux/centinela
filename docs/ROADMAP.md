@@ -49,14 +49,15 @@ Cada fase termina en algo presentable. No se adelanta una fase sin pedido explí
 ## Fase 3 — Conexión con el agente
 - [x] ADR del proveedor de embeddings: Voyage AI ([ADR-007](decisiones/ADR-007-proveedor-de-embeddings.md))
 - [x] Enmascarado en `mesa-servicio` y outbox para publicar `TicketCreado` (contrato de enmascarado compartido con el agente en `tests/contratos/`)
-- [ ] El agente pasa de consola a worker que consume la cola
+- [x] El agente pasa de consola a worker que consume la cola (sigue aceptando un ticket desde un archivo para probar el modelo)
+- [x] Un usuario de RabbitMQ por servicio con permisos mínimos; colas quorum, DLQ y enlaces declarados en `deploy/rabbitmq` (A3)
 - [ ] API interna de solo lectura de `mesa-servicio` para las herramientas, siempre enmascarada
 - [ ] Módulo `conocimiento` con pgvector y embeddings; herramientas con búsqueda por significado
 - [ ] `TicketTriado` guardado en `mesa-servicio`, sin aplicarse solo
-- [ ] Idempotencia, reintentos con backoff y DLQ en todos los consumidores; en el agente, deduplicación también por `ticketId`
+- [ ] Idempotencia, reintentos con backoff y DLQ en todos los consumidores; en el agente, deduplicación también por `ticketId` (listo en el agente; falta el consumidor de `mesa-servicio`)
 - [ ] Tope diario de tokens en el agente (al alcanzarlo, triaje manual sin llamar al modelo)
-- [ ] `correlationId` de punta a punta en logs JSON
-- [ ] Testcontainers para la integración con Postgres y RabbitMQ
+- [ ] `correlationId` de punta a punta en logs JSON (viaja de la petición al agente y queda en sus logs JSON; faltan los logs JSON de `mesa-servicio`)
+- [x] Testcontainers para la integración con Postgres y RabbitMQ (en los dos servicios, con el mismo init de la base y las mismas definiciones del broker)
 
 **Hecho cuando:** se puede seguir un ticket por su `correlationId` desde su creación hasta el triaje, y tumbar el agente a mitad no pierde tickets.
 
