@@ -13,6 +13,11 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 public class MesaServicioApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(MesaServicioApplication.class, args);
+        var contexto = SpringApplication.run(MesaServicioApplication.class, args);
+        // A14: con el perfil "migracion" el proceso solo migra y termina, con exit 0 si salió bien. Sin esto quedaría
+        // vivo por los hilos de la aplicación, y un Job de Kubernetes nunca terminaría.
+        if (contexto.getEnvironment().matchesProfiles("migracion")) {
+            System.exit(SpringApplication.exit(contexto));
+        }
     }
 }

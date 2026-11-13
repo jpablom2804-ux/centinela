@@ -1,8 +1,8 @@
 package cr.centinela.mesaservicio.plataforma;
 
-import java.time.Clock;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -22,6 +22,9 @@ import org.springframework.security.web.SecurityFilterChain;
  * petición trae sus credenciales, así que un sitio ajeno no puede usarlas en nombre del usuario.
  */
 @Configuration
+// Con el perfil "migracion" no hay servidor web: sin esto, el proceso de migración terminaba con error (exit 1)
+// aunque Flyway ya hubiera migrado, y un Job de Kubernetes lo daría por fallido.
+@ConditionalOnWebApplication
 class ConfiguracionSeguridad {
 
     @Bean
@@ -40,11 +43,6 @@ class ConfiguracionSeguridad {
     @Bean
     PasswordEncoder codificador() {
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-    }
-
-    @Bean
-    Clock reloj() {
-        return Clock.systemUTC();
     }
 
     /**

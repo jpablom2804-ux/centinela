@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.util.Map;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
  * réplicas, ShedLock asegura que solo una revise a la vez (AGENTS.md).
  */
 @Component
+// El proceso de migración no revisa SLA: solo migra y termina (A14).
+@Profile("!migracion")
 class VigilanteSla {
 
     private static final String SISTEMA = "sistema:sla";
